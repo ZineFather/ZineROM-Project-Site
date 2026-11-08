@@ -1,0 +1,45 @@
+"use strict";window.ZINE_SCREENSHOT_GALLERY=(()=>{const E="ZineFather",S=window.location.pathname.split("/").filter(Boolean)[0]||"ZineROM-Project-Site",w=window.location.hostname.toLowerCase()==="zinefather.github.io",N=`https://raw.githubusercontent.com/${E}/${encodeURIComponent(S)}/main/screenshots/`,$=w?`https://api.github.com/repos/${E}/${encodeURIComponent(S)}/contents/screenshots?ref=main`:"",O=w?N:"screenshots/",b={oneUi7:{title:"One UI 7",subtitleKey:"screenshotsPreviousGeneration"},oneUi9:{title:"One UI 9",subtitleKey:"screenshotsLatestGeneration"}},p=Object.keys(b),q=/\.(?:png|jpe?g|webp|avif)$/i;function A(n){return typeof n=="string"&&n.length<=240&&!n.includes("/")&&n!=="."&&n!==".."&&q.test(n)}function I(n){return p.includes(n)}async function k(){const[n,o]=await Promise.allSettled([fetch("screenshots/metadata.json",{cache:"no-cache"}).then(t=>{if(!t.ok)throw new Error("Screenshot metadata unavailable");return t.json()}),$?fetch($,{cache:"no-store",headers:{Accept:"application/vnd.github+json"}}).then(t=>{if(!t.ok)throw new Error("GitHub screenshot directory unavailable");return t.json()}):Promise.resolve(null)]),i=n.status==="fulfilled"?n.value:{screenshots:[]},h=Array.isArray(i.screenshots)?i.screenshots:[],c=new Map(h.filter(t=>A(t.filename)).map(t=>[t.filename,t])),r=o.status==="fulfilled"&&Array.isArray(o.value),g=r?o.value.filter(t=>t.type==="file"&&A(t.name)).map(t=>t.name):[...c.keys()],f=[...new Set(g)],v=new Map(h.map((t,l)=>[t.filename,l])),u=f.map(t=>{const l=c.get(t)||{};if(!I(l.generation))return null;const a=t.replace(/\.[^.]+$/,"").replace(/[_-]+/g," ");return{filename:t,url:O+encodeURIComponent(t),title:l.title||a,description:l.description||l.title||a,generation:l.generation}}).filter(Boolean);u.sort((t,l)=>(v.get(t.filename)??Number.MAX_SAFE_INTEGER)-(v.get(l.filename)??Number.MAX_SAFE_INTEGER)||t.filename.localeCompare(l.filename));const d=new Set(u.map(t=>t.filename));return{items:u,directoryAvailable:r,unassignedFilenames:f.filter(t=>!d.has(t))}}function G(n,o,i){let h=[],c=[],r="oneUi9",g=0;n.innerHTML=`
+      <section class="shell editorial-page screenshot-page" aria-labelledby="screenshots-title">
+        <p class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>${i(o("screenshotsEyebrow"))}</p>
+        <h1 id="screenshots-title">${i(o("screenshotsTitle"))}</h1>
+        <p class="editorial-lead">${i(o("screenshotsIntro"))}</p>
+        <p class="screenshot-load-status" id="screenshot-load-status" role="status" aria-live="polite">${i(o("screenshotsLoading"))}</p>
+        <p class="screenshot-unassigned-note" id="screenshot-unassigned-note" role="status" aria-live="polite" hidden></p>
+        <div class="screenshot-generation-tabs" id="screenshot-generation-tabs" role="tablist" aria-label="${i(o("screenshotsGenerationNavigation"))}"></div>
+        <section class="screenshot-generation-panel" id="screenshot-generation-panel" role="tabpanel" tabindex="0">
+          <header class="screenshot-generation-heading">
+            <div class="screenshot-generation-heading-copy">
+              <p class="screenshot-generation-overline" id="screenshot-generation-overline"></p>
+              <h2 id="screenshot-generation-title"></h2>
+              <p class="screenshot-generation-subtitle" id="screenshot-generation-subtitle"></p>
+            </div>
+            <span class="screenshot-generation-count" id="screenshot-generation-count" aria-live="polite"></span>
+          </header>
+          <p class="screenshot-status" id="screenshot-status" role="status" aria-live="polite"></p>
+          <div class="screenshot-grid" id="screenshot-grid"></div>
+        </section>
+      </section>
+      <dialog class="screenshot-lightbox" id="screenshot-lightbox" aria-labelledby="screenshot-caption-title">
+        <div class="lightbox-toolbar">
+          <span class="lightbox-count" id="lightbox-count"></span>
+          <button class="lightbox-close" type="button" data-lightbox-close aria-label="${i(o("lightboxClose"))}">\xD7</button>
+        </div>
+        <div class="lightbox-stage">
+          <button class="lightbox-arrow" type="button" data-lightbox-prev aria-label="${i(o("lightboxPrevious"))}">\u2039</button>
+          <figure class="lightbox-figure">
+            <img id="lightbox-image" alt="" decoding="async">
+            <figcaption><strong id="screenshot-caption-title"></strong><span id="screenshot-caption-generation"></span></figcaption>
+          </figure>
+          <button class="lightbox-arrow" type="button" data-lightbox-next aria-label="${i(o("lightboxNext"))}">\u203A</button>
+        </div>
+      </dialog>`;const f=n.querySelector("#screenshot-generation-tabs"),v=n.querySelector("#screenshot-generation-panel"),u=n.querySelector("#screenshot-grid"),d=n.querySelector("#screenshot-load-status"),t=n.querySelector("#screenshot-unassigned-note"),l=n.querySelector("#screenshot-status"),a=n.querySelector("#screenshot-lightbox");function P(){const e=c[g];e&&(n.querySelector("#lightbox-image").src=e.url,n.querySelector("#lightbox-image").alt=e.description,n.querySelector("#screenshot-caption-title").textContent=e.title,n.querySelector("#screenshot-caption-generation").textContent=b[e.generation].title,n.querySelector("#lightbox-count").textContent=`${g+1} / ${c.length}`)}function y(e){c.length&&(g=(e+c.length)%c.length,P(),!a.open&&typeof a.showModal=="function"?a.showModal():a.open||a.setAttribute("open","open"))}function x(){c=h.filter(s=>s.generation===r);const e=p.indexOf(r);if(f.innerHTML=p.map((s,m)=>{const C=h.filter(_=>_.generation===s).length;return`<button class="screenshot-generation-tab${s===r?" is-active":""}" type="button" role="tab" id="screenshot-tab-${s}" data-generation="${s}" aria-selected="${s===r}" aria-controls="screenshot-generation-panel" tabindex="${s===r?"0":"-1"}">
+          <span class="generation-tab-index" aria-hidden="true">0${m+1}</span>
+          <span class="generation-tab-title">${i(b[s].title)}</span>
+          <span class="generation-tab-count" aria-label="${i(String(C))}">${C}</span>
+        </button>`}).join(""),v.setAttribute("aria-labelledby",`screenshot-tab-${r}`),n.querySelector("#screenshot-generation-overline").textContent=`ZINEROM \xB7 GENERATION 0${e+1}`,n.querySelector("#screenshot-generation-title").textContent=b[r].title,n.querySelector("#screenshot-generation-subtitle").textContent=o(b[r].subtitleKey),n.querySelector("#screenshot-generation-count").textContent=String(c.length).padStart(2,"0"),!c.length){u.innerHTML="",l.textContent=o("screenshotsGenerationEmpty").replace("{generation}",b[r].title),l.hidden=!1;return}l.hidden=!0,u.innerHTML=c.map((s,m)=>`
+        <article class="screenshot-card">
+          <button class="screenshot-open" type="button" data-gallery-open="${m}" aria-label="${i(o("screenshotPreview"))}: ${i(s.title)}">
+            <span class="screenshot-thumb"><img src="${i(s.url)}" alt="${i(s.description)}" loading="lazy" decoding="async"></span>
+            <span class="screenshot-card-copy"><span class="screenshot-generation-tag">${i(b[s.generation].title)}</span><strong>${i(s.title)}</strong><span class="screenshot-card-cta">${i(o("screenshotPreview"))}<span aria-hidden="true">\u2197</span></span></span>
+          </button>
+        </article>`).join("")}function R(e,s=!1){I(e)&&(r=e,a.open&&a.close?.(),x(),s&&f.querySelector(`[data-generation="${e}"]`)?.focus())}f.addEventListener("click",e=>{const s=e.target.closest("[data-generation]");s&&R(s.dataset.generation)}),f.addEventListener("keydown",e=>{if(!["ArrowLeft","ArrowRight","Home","End"].includes(e.key))return;e.preventDefault();const s=p.indexOf(r),m=e.key==="Home"?0:e.key==="End"?p.length-1:(s+(e.key==="ArrowRight"?1:-1)+p.length)%p.length;R(p[m],!0)}),u.addEventListener("click",e=>{const s=e.target.closest("[data-gallery-open]");s&&y(Number(s.dataset.galleryOpen))}),n.querySelector("[data-lightbox-close]").addEventListener("click",()=>a.close?.()),n.querySelector("[data-lightbox-prev]").addEventListener("click",()=>y(g-1)),n.querySelector("[data-lightbox-next]").addEventListener("click",()=>y(g+1)),a.addEventListener("click",e=>{e.target===a&&a.close?.()}),a.addEventListener("keydown",e=>{e.key==="ArrowLeft"&&(e.preventDefault(),y(g-1)),e.key==="ArrowRight"&&(e.preventDefault(),y(g+1))}),k().then(e=>{u.isConnected&&(h=e.items,h.some(s=>s.generation==="oneUi9")?r="oneUi9":h.some(s=>s.generation==="oneUi7")&&(r="oneUi7"),d.hidden=!0,!e.directoryAvailable&&h.length&&(d.textContent=o("screenshotsFallback"),d.hidden=!1),!e.directoryAvailable&&!h.length&&!e.unassignedFilenames.length?(d.textContent=o("screenshotsError"),d.hidden=!1):e.directoryAvailable&&!h.length&&!e.unassignedFilenames.length&&(d.textContent=o("screenshotsEmpty"),d.hidden=!1),e.unassignedFilenames.length&&(t.textContent=o("screenshotsUnassigned").replace("{count}",String(e.unassignedFilenames.length)),t.hidden=!1,t.title=e.unassignedFilenames.join(", ")),x())}).catch(()=>{u.isConnected&&(d.textContent=o("screenshotsError"),d.hidden=!1,x())})}return{render:G}})();

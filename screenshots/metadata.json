@@ -1,0 +1,77 @@
+{
+  "version": 2,
+  "screenshots": [
+    {
+      "filename": "IMG_20261104_235706_090.jpg",
+      "title": "Lavender Lock Screen",
+      "description": "Lavender lock screen showing 01:25, Friday 9 October, and phone and camera shortcuts.",
+      "generation": "oneUi7"
+    },
+    {
+      "filename": "IMG_20261104_235705_962.jpg",
+      "title": "Home Screen with Weather Widget",
+      "description": "One UI Home screen with a weather prompt, Google search bar, and app dock on a dark starry wallpaper.",
+      "generation": "oneUi7"
+    },
+    {
+      "filename": "IMG_20261104_235705_605.jpg",
+      "title": "Home Screen with Media Volume Slider",
+      "description": "One UI Home screen with app icons and the media-volume slider overlaid along the right edge.",
+      "generation": "oneUi7"
+    },
+    {
+      "filename": "IMG_20261104_235706_115.jpg",
+      "title": "Expanded Volume Controls",
+      "description": "Expanded four-slider One UI volume panel displayed over the home screen.",
+      "generation": "oneUi7"
+    },
+    {
+      "filename": "IMG_20261104_235705_814.jpg",
+      "title": "Quick Settings and Device Controls",
+      "description": "Expanded quick settings with Wi-Fi, Bluetooth, brightness and volume controls, media playback, and device tiles.",
+      "generation": "oneUi7"
+    },
+    {
+      "filename": "IMG_20261104_235705_791.jpg",
+      "title": "Galaxy AI Feature Overview",
+      "description": "Galaxy AI introduction featuring Note assist, Transcript assist, Browsing assist, and Now brief.",
+      "generation": "oneUi7"
+    },
+    {
+      "filename": "IMG_20261104_235705_421.jpg",
+      "title": "Camera Video Resolution",
+      "description": "Samsung Camera video options with UHD selected at 30 FPS and FHD and HD alternatives.",
+      "generation": "oneUi7"
+    },
+    {
+      "filename": "IMG_20261104_235705_851.jpg",
+      "title": "Samsung DeX Setup",
+      "description": "Samsung DeX setup screen describing wired or wireless display connections and the Start DeX option.",
+      "generation": "oneUi7"
+    },
+    {
+      "filename": "Screenshot_20261107_083716_One UI Home.jpg",
+      "title": "Lock Screen at 00:07",
+      "description": "Dark lock screen with an oversized 00:07 clock and phone and camera shortcuts.",
+      "generation": "oneUi9"
+    },
+    {
+      "filename": "Screenshot_20261107_083719_One UI Home.jpg",
+      "title": "Home Screen and App Dock",
+      "description": "One UI Home screen with app icons, a Google search bar, and a dark wallpaper.",
+      "generation": "oneUi9"
+    },
+    {
+      "filename": "Screenshot_20261107_083730_Settings.jpg",
+      "title": "Galaxy AI: Now Brief and Now Nudge",
+      "description": "Galaxy AI feature information page listing Creative studio, Audio eraser, Now brief, Now nudge, Notification highlights, and Health assist.",
+      "generation": "oneUi9"
+    },
+    {
+      "filename": "Screenshot_20261107_083741_AlwaysOnDisplay.jpg",
+      "title": "Always On Display Settings",
+      "description": "Always On Display settings for the lock screen wallpaper, background, Now bar, and display schedule.",
+      "generation": "oneUi9"
+    }
+  ]
+}

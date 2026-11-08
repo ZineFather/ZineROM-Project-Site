@@ -1,0 +1,20 @@
+"use strict";window.ZINE_COMMUNITY_PAGE=(()=>{const t=Object.freeze({community:"https://t.me/ZineROMProject",announcements:"https://t.me/zineromupdates",tutorial:"https://t.me/ZineROMProject/139",bugs:"https://t.me/ZineROMProject/9"}),c={community:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2v-5.1A7.5 7.5 0 1 1 20 11.5Z"/><path d="M8 10h8M8 13.5h5"/></svg>',announcements:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4"/><path d="M20 4l1.5-1.5M4 4 2.5 2.5"/></svg>',tutorial:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5v-17Z"/><path d="M4 4.5v17M8 6h8M8 9.5h6"/><path d="m11 13 4 2.5-4 2.5z"/></svg>',bug:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8 7 5M15 8l2-3M5 10H2M22 10h-3M5 15H2m20 0h-3M7 19l-2 2m14-2 2 2"/><path d="M6 12a6 6 0 0 1 12 0v4a6 6 0 0 1-12 0v-4ZM9 12h6M9 16h6"/></svg>',features:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13 2-9 12h7l-1 8 10-13h-7z"/><path d="M19 3v4m-2-2h4"/></svg>',ideas:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6m-5 3h4m-2-19a7 7 0 0 0-4 12.7c.7.5 1 1.2 1 2.3h6c0-1.1.3-1.8 1-2.3A7 7 0 0 0 12 2Z"/><path d="M12 6v5m-2-3 2 3 2-3"/></svg>'},a=[{title:"resourceCommunityTitle",description:"resourceCommunityDescription",url:t.community,icon:"community"},{title:"resourceAnnouncementsTitle",description:"resourceAnnouncementsDescription",url:t.announcements,icon:"announcements"},{title:"resourceTutorialTitle",description:"resourceTutorialDescription",url:t.tutorial,icon:"tutorial"},{title:"resourceBugTitle",description:"resourceBugDescription",url:t.bugs,icon:"bug"}],u=[{title:"resourceBugTitle",description:"resourceBugDescription",url:t.bugs,icon:"bug"},{title:"feedbackFeatureTitle",description:"feedbackFeatureDescription",url:t.community,icon:"features"},{title:"feedbackIdeasTitle",description:"feedbackIdeasDescription",url:t.community,icon:"ideas"}];function r(n,e,i,o){const s=e(n.title);return`<a class="community-link-card ${o}" href="${i(n.url)}" target="_blank" rel="noopener noreferrer" aria-label="${i(s)}: ${i(e(n.description))}">
+      <span class="community-link-icon" aria-hidden="true">${c[n.icon]}</span>
+      <strong>${i(s)}</strong>
+      <span class="community-link-description">${i(e(n.description))}</span>
+      <span class="community-link-action">${i(e("resourceOpenTelegram"))}<span aria-hidden="true">\u2197</span></span>
+    </a>`}function l(n,e,i){n.innerHTML=`
+      <section class="shell editorial-page community-page" aria-labelledby="community-title">
+        <p class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>${i(e("communityEyebrow"))}</p>
+        <h1 id="community-title">${i(e("communityTitle"))}</h1>
+        <p class="editorial-lead">${i(e("communityIntro"))}</p>
+        <section class="community-block" id="community-resources" aria-labelledby="community-resources-title">
+          <div class="community-block-heading"><p class="overline" id="community-resources-title">${i(e("communityResourcesTitle"))}</p></div>
+          <div class="community-resource-grid">${a.map(o=>r(o,e,i,"resource-card")).join("")}</div>
+        </section>
+        <section class="community-block feedback-block" id="feedback-contributions" aria-labelledby="feedback-title">
+          <div class="community-block-heading"><p class="overline">${i(e("feedbackTitle"))}</p><h2 id="feedback-title">${i(e("feedbackTitle"))}</h2><p>${i(e("feedbackIntro"))}</p></div>
+          <div class="contribution-grid">${u.map(o=>r(o,e,i,"contribution-card")).join("")}</div>
+        </section>
+        <aside class="community-support-strip"><div><p class="overline">${i(e("supportEyebrow"))}</p><h2>${i(e("supportCopyShort"))}</h2></div><a class="button button-primary" href="#/support">${i(e("requestSupport"))}<span aria-hidden="true">\u2197</span></a></aside>
+      </section>`}return{render:l,destinations:t}})();
