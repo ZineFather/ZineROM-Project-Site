@@ -1,2 +1,3 @@
 User-agent: *
 Allow: /
+Sitemap: https://zinefather.github.io/ZineROM-Project-Site/sitemap.xml
