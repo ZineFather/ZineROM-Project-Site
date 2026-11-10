@@ -103,6 +103,7 @@
         <div class="detail-copy device-overview-copy">
           <p class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>${escapeHTML(t("selectedDevice"))}</p>
           <div class="detail-title-row"><h1>${escapeHTML(e.name)}</h1>${hasTestBuild?"":`<span class="state-pill status-${deviceStatus.type}">${escapeHTML(deviceStatus.label)}</span>`}</div>
+          <div class="device-overview-meta"><span>${escapeHTML(e.variant)}</span><code>${escapeHTML(e.model)}</code></div>
           <div class="device-overview-specs">
             ${window.ZINE_DEVICE_OVERVIEW_GROUPS.map(group=>{const value=window.ZINE_DEVICE_OVERVIEWS[e.id][group.key],secondary=[value.secondary,value.refreshRate].filter(Boolean).join(" · ");return `<article class="device-overview-card">${group.icon}<div class="device-overview-values"><p class="device-overview-label">${escapeHTML(group.label)}</p><strong>${escapeHTML(value.primary)}</strong><span>${escapeHTML(secondary)}</span></div></article>`}).join("")}
           </div>
