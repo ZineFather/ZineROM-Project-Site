@@ -96,22 +96,23 @@
     </article>`}function renderRelease(e,a){const n=document.getElementById("release-content");if(!a){n.innerHTML=`<div class="release-variant-grid">${renderEmptyRelease(null,!0)}</div>`;return}const o=releaseRecords(e.builds[a]);n.innerHTML=o.length?`<div class="release-variant-grid">${o.map(i=>renderReleaseVariant(i,a)).join("")}</div>`:`<div class="release-variant-grid">${renderEmptyRelease(a)}</div>`;const s=document.getElementById("copy-checksum");s&&s.addEventListener("click",copyChecksum)}function bindSupportButtons(e,a){document.querySelectorAll("[data-request-support]").forEach(n=>{n.addEventListener("click",()=>openSupportDialog(`${e.name} \xB7 One UI ${a||""}`.trim()))})}function renderDevicePage(e,a){const n=versionFromHash(a),o=ONE_UI_VERSIONS.includes(n)?n:detailDefaultVersion(e),deviceStatus=statusForDevice(e),hasTestBuild=allDeviceReleases(e).some(release=>release.status==="test"&&release.downloadUrl);app.innerHTML=`
     <section class="shell detail-page">
       <a class="back-link" href="#/devices"><span aria-hidden="true">\u2190</span>${escapeHTML(t("backCatalog"))}</a>
-      <section class="detail-hero device-overview" aria-label="${escapeHTML(e.name)} device overview">
-        <div class="device-overview-image-panel">
-          <img src="${escapeHTML(e.image)}" alt="${escapeHTML(t("altPrefix"))} ${escapeHTML(e.name)}" fetchpriority="high">
+      <section class="device-header-card" aria-label="${escapeHTML(e.name)} device overview">
+        <div class="device-header-image-column">
+          <img class="device-header-image" src="${escapeHTML(e.image)}" alt="${escapeHTML(t("altPrefix"))} ${escapeHTML(e.name)}" fetchpriority="high">
         </div>
-        <div class="detail-copy device-overview-copy">
-          <p class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>${escapeHTML(t("selectedDevice"))}</p>
-          <div class="detail-title-row"><h1>${escapeHTML(e.name)}</h1>${hasTestBuild?"":`<span class="state-pill status-${deviceStatus.type}">${escapeHTML(deviceStatus.label)}</span>`}</div>
-          <div class="device-overview-meta"><span>${escapeHTML(e.variant)}</span><code>${escapeHTML(e.model)}</code></div>
-          <div class="device-overview-specs">
-            ${window.ZINE_DEVICE_OVERVIEW_GROUPS.map(group=>{const value=window.ZINE_DEVICE_OVERVIEWS[e.id][group.key],secondary=[value.secondary,value.refreshRate].filter(Boolean).join(" · ");return `<article class="device-overview-card">${group.icon}<div class="device-overview-values"><p class="device-overview-label">${escapeHTML(group.label)}</p><strong>${escapeHTML(value.primary)}</strong><span>${escapeHTML(secondary)}</span></div></article>`}).join("")}
+        <div class="device-header-details">
+          <div class="device-header-heading">
+            <p class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>${escapeHTML(t("selectedDevice"))}</p>
+            <div class="device-header-title-row"><h1>${escapeHTML(e.name)}</h1>${hasTestBuild?"":`<span class="state-pill status-${deviceStatus.type}">${escapeHTML(deviceStatus.label)}</span>`}</div>
+            <div class="device-header-meta"><span>${escapeHTML(e.variant)}</span><code>${escapeHTML(e.model)}</code></div>
+          </div>
+          <div class="device-header-specs" aria-label="Quick device specifications">
+            ${window.ZINE_DEVICE_OVERVIEW_GROUPS.map(group=>{const value=window.ZINE_DEVICE_OVERVIEWS[e.id][group.key],secondary=[value.secondary,value.refreshRate].filter(Boolean).join(" · ");return `<article class="device-header-spec-card">${group.icon}<div class="device-header-spec-values"><p>${escapeHTML(group.label)}</p><strong>${escapeHTML(value.primary)}</strong><span>${escapeHTML(secondary)}</span></div></article>`}).join("")}
           </div>
           ${e.id==="a11-4g"?`<p class="detail-note">${escapeHTML(t("noteA11"))}</p>`:""}
-          <button class="button button-outline" type="button" data-request-support>${escapeHTML(t("requestSupport"))}<span aria-hidden="true">\u2197</span></button>
+          <button class="button button-outline device-header-support" type="button" data-request-support>${escapeHTML(t("requestSupport"))}<span aria-hidden="true">\u2197</span></button>
         </div>
       </section>
-
       <section class="version-section" aria-labelledby="version-title">
         <div class="version-heading"><div><p class="overline">${escapeHTML(t("releaseOverline"))}</p><h2 id="version-title">${escapeHTML(t("versionTitle"))}</h2></div><p>${escapeHTML(t("versionIntro"))}</p></div>
         <div class="version-selector" role="group" aria-label="${escapeHTML(t("versionTitle"))}">
