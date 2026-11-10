@@ -200,3 +200,35 @@ span.text-\[11px\] {
 .text-gray-500 {
   color: #9ca3af !important;
 }
+
+/* Keep the readability patch from widening the mobile header. */
+@media (max-width: 520px) {
+  .topbar {
+    gap: 6px;
+  }
+
+  .brand {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .brand-name {
+    min-width: 0;
+  }
+
+  .brand-name strong {
+    max-width: 78px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .header-tools {
+    flex: 0 0 auto;
+    gap: 4px;
+  }
+
+  .menu-toggle {
+    flex: 0 0 38px;
+  }
+}
