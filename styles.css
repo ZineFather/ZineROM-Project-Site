@@ -178,3 +178,25 @@
 @media (prefers-reduced-motion: reduce) {
   .device-header-spec-card { transition: none; }
 }
+
+/* Fix tiny text readability across mobile and desktop */
+body, p, span, div {
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Bump tiny labels, specs headers, and small notes to be readable without zooming */
+.text-xs,
+[class*="text-xs"],
+small,
+.spec-label,
+span.text-\[10px\],
+span.text-\[11px\] {
+  font-size: 0.825rem !important;
+  line-height: 1.25rem !important;
+}
+
+/* Make secondary body text and metadata slightly clearer */
+.text-gray-400,
+.text-gray-500 {
+  color: #9ca3af !important;
+}
