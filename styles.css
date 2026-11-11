@@ -232,3 +232,42 @@ span.text-\[11px\] {
     flex: 0 0 38px;
   }
 }
+
+/* Samsung Internet: keep the site's explicitly selected theme and image surfaces intact. */
+html {
+  color-scheme: only dark;
+  forced-color-adjust: none;
+}
+
+html[data-theme="light"] {
+  color-scheme: only light;
+}
+
+html[data-theme="dark"] {
+  color-scheme: only dark;
+}
+
+body,
+img,
+.device-image-canvas,
+.showcase-image,
+.device-card-image,
+.device-header-card,
+.device-header-image-column {
+  forced-color-adjust: none;
+}
+
+/* Transparent device renders should reveal the designed surface, not a browser-injected one. */
+.showcase-image,
+.device-card-image,
+.device-header-image-column {
+  background-color: var(--image-bg);
+}
+
+.device-header-image-column {
+  background-image: radial-gradient(circle at center, rgba(91, 164, 250, .12), transparent 68%);
+}
+
+html[data-theme="light"] .device-header-image-column {
+  background-image: radial-gradient(circle at center, rgba(36, 111, 191, .08), transparent 68%);
+}
