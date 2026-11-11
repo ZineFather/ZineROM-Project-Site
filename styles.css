@@ -309,7 +309,15 @@ html[data-theme="light"] .device-header-image-column {
 
 /* Samsung Internet: isolate device mockups from forced dark-mode inversion. */
 .device-card,
+.device-card-link,
+.device-card-content,
 .device-card-image,
+.showcase-device,
+.showcase-label,
+.device-header-card,
+.device-header-image-column,
+.phone-mockup,
+.device-image-canvas,
 .device-card-image img,
 .showcase-device,
 .showcase-image,
@@ -325,8 +333,15 @@ html[data-theme="light"] .device-header-image-column {
   forced-color-adjust: none !important;
   filter: none !important;
   -webkit-filter: none !important;
-  -webkit-user-select: none;
-  user-select: none;
+}
+
+.device-card,
+.device-card-link,
+.device-card-content,
+.showcase-device,
+.showcase-label,
+.device-header-card {
+  color: #101d2c;
 }
 
 .device-card-image,
@@ -348,6 +363,4 @@ html[data-theme="light"] .device-header-image-column {
   max-width: 100%;
   height: auto;
   padding: 8px;
-  -webkit-user-select: none;
-  user-select: none;
 }
