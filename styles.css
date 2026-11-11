@@ -254,20 +254,28 @@ span.text-\[11px\] {
 }
 
 /* Samsung Internet: keep the site's explicitly selected theme and image surfaces intact. */
+/* Samsung Internet: keep browser adaptation subordinate to the site's theme toggle. */
 html {
-  color-scheme: only dark;
+  color-scheme: light dark;
+  background-color: var(--bg);
+  color: var(--text);
   forced-color-adjust: none;
 }
 
 html[data-theme="light"] {
-  color-scheme: only light;
+  color-scheme: light;
+  background-color: #f4f7fb;
+  color: #101d2c;
 }
 
 html[data-theme="dark"] {
-  color-scheme: only dark;
+  color-scheme: dark;
+  background-color: #08111f;
+  color: #f2f6fb;
 }
 
 body,
+.main-content,
 img,
 .device-image-canvas,
 .showcase-image,
@@ -275,6 +283,12 @@ img,
 .device-header-card,
 .device-header-image-column {
   forced-color-adjust: none;
+}
+
+body,
+.main-content {
+  background-color: var(--bg);
+  color: var(--text);
 }
 
 /* Transparent device renders should reveal the designed surface, not a browser-injected one. */
