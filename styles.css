@@ -398,3 +398,5 @@ html[data-theme="light"] .device-header-card {
   filter: none !important;
   -webkit-filter: none !important;
 }
+
+.release-feature-group + .release-feature-group{margin-top:10px;padding-top:9px;border-top:1px solid var(--line)}.release-feature-group h5{margin:0 0 6px;color:var(--text);font-size:9px;font-weight:760;letter-spacing:.02em}.release-feature-group .release-detail-list{margin-top:0}
