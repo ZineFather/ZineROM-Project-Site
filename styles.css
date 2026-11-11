@@ -306,61 +306,33 @@ html[data-theme="light"] .device-header-image-column {
   background-image: radial-gradient(circle at center, rgba(36, 111, 191, .08), transparent 68%);
 }
 
-
-/* Samsung Internet: isolate device mockups from forced dark-mode inversion. */
-.device-card,
-.device-card-link,
-.device-card-content,
+/* Samsung Internet: isolate only the phone-image surfaces; keep card chrome on the site theme. */
 .device-card-image,
-.showcase-device,
-.showcase-label,
-.device-header-card,
-.device-header-image-column,
-.phone-mockup,
-.device-image-canvas,
-.device-card-image img,
-.showcase-device,
 .showcase-image,
-.showcase-image img,
-.device-header-card,
 .device-header-image-column,
-.device-header-image-column img,
 .phone-mockup,
-.phone-mockup img,
 .device-image-canvas {
   background-color: #ffffff !important;
   color-scheme: only light !important;
   forced-color-adjust: none !important;
   filter: none !important;
   -webkit-filter: none !important;
-}
-
-.device-card,
-.device-card-link,
-.device-card-content,
-.showcase-device,
-.showcase-label,
-.device-header-card {
-  color: #101d2c;
-}
-
-.device-card-image,
-.showcase-image,
-.device-header-image-column,
-.phone-mockup {
-  isolation: isolate;
   overflow: hidden;
+  isolation: isolate;
 }
 
 .device-card-image img,
 .showcase-image img,
 .device-header-image-column img,
-.phone-mockup img {
+.phone-mockup img,
+.device-image-canvas > img {
   display: block;
   background-color: #ffffff !important;
+  color-scheme: only light !important;
+  forced-color-adjust: none !important;
+  filter: none !important;
+  -webkit-filter: none !important;
   object-fit: contain;
   object-position: center;
   max-width: 100%;
-  height: auto;
-  padding: 8px;
 }
