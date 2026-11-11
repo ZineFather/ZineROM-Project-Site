@@ -365,3 +365,36 @@ html[data-theme="light"] .device-header-card {
   filter: none !important;
   -webkit-filter: none !important;
 }
+
+/* Samsung Internet: the device-image surface is pure white, without theme gradients. */
+.device-card-image,
+.showcase-image,
+.device-header-image-column,
+.phone-mockup,
+.device-image-canvas {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+  background-clip: padding-box;
+  -webkit-background-clip: padding-box;
+  color-scheme: only light !important;
+  forced-color-adjust: none !important;
+  mix-blend-mode: normal !important;
+  filter: none !important;
+  -webkit-filter: none !important;
+}
+
+.device-card-image img,
+.showcase-image img,
+.device-header-image-column img,
+.phone-mockup img,
+.device-image-canvas > img {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+  color-scheme: only light !important;
+  forced-color-adjust: none !important;
+  mix-blend-mode: normal !important;
+  filter: none !important;
+  -webkit-filter: none !important;
+}
