@@ -336,3 +336,32 @@ html[data-theme="light"] .device-header-image-column {
   object-position: center;
   max-width: 100%;
 }
+
+/* Keep card chrome aligned with the site's toggle; only image wrappers stay white. */
+html[data-theme="dark"] .device-card,
+html[data-theme="dark"] .device-card-link,
+html[data-theme="dark"] .device-card-content,
+html[data-theme="dark"] .showcase-device,
+html[data-theme="dark"] .showcase-label,
+html[data-theme="dark"] .device-header-card {
+  background-color: #101d2d !important;
+  color: #f2f6fb !important;
+  color-scheme: only dark !important;
+  forced-color-adjust: none !important;
+  filter: none !important;
+  -webkit-filter: none !important;
+}
+
+html[data-theme="light"] .device-card,
+html[data-theme="light"] .device-card-link,
+html[data-theme="light"] .device-card-content,
+html[data-theme="light"] .showcase-device,
+html[data-theme="light"] .showcase-label,
+html[data-theme="light"] .device-header-card {
+  background-color: #ffffff !important;
+  color: #101d2c !important;
+  color-scheme: only light !important;
+  forced-color-adjust: none !important;
+  filter: none !important;
+  -webkit-filter: none !important;
+}
