@@ -178,3 +178,96 @@
 @media (prefers-reduced-motion: reduce) {
   .device-header-spec-card { transition: none; }
 }
+
+/* Fix tiny text readability across mobile and desktop */
+body, p, span, div {
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Bump tiny labels, specs headers, and small notes to be readable without zooming */
+.text-xs,
+[class*="text-xs"],
+small,
+.spec-label,
+span.text-\[10px\],
+span.text-\[11px\] {
+  font-size: 0.825rem !important;
+  line-height: 1.25rem !important;
+}
+
+/* Make secondary body text and metadata slightly clearer */
+.text-gray-400,
+.text-gray-500 {
+  color: #9ca3af !important;
+}
+
+/* Keep the readability patch from widening the mobile header. */
+@media (max-width: 520px) {
+  .topbar {
+    gap: 6px;
+  }
+
+  .brand {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .brand-name {
+    min-width: 0;
+  }
+
+  .brand-name strong {
+    max-width: 78px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .header-tools {
+    flex: 0 0 auto;
+    gap: 4px;
+  }
+
+  .menu-toggle {
+    flex: 0 0 38px;
+  }
+}
+
+/* Samsung Internet: keep the site's explicitly selected theme and image surfaces intact. */
+html {
+  color-scheme: only dark;
+  forced-color-adjust: none;
+}
+
+html[data-theme="light"] {
+  color-scheme: only light;
+}
+
+html[data-theme="dark"] {
+  color-scheme: only dark;
+}
+
+body,
+img,
+.device-image-canvas,
+.showcase-image,
+.device-card-image,
+.device-header-card,
+.device-header-image-column {
+  forced-color-adjust: none;
+}
+
+/* Transparent device renders should reveal the designed surface, not a browser-injected one. */
+.showcase-image,
+.device-card-image,
+.device-header-image-column {
+  background-color: var(--image-bg);
+}
+
+.device-header-image-column {
+  background-image: radial-gradient(circle at center, rgba(91, 164, 250, .12), transparent 68%);
+}
+
+html[data-theme="light"] .device-header-image-column {
+  background-image: radial-gradient(circle at center, rgba(36, 111, 191, .08), transparent 68%);
+}
