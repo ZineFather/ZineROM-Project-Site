@@ -3,6 +3,11 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+// Firebase is enabled only when google-services.json is supplied by the build environment.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
 android {
     namespace = "com.zinerom.info"
     compileSdk = 36
@@ -10,8 +15,8 @@ android {
         applicationId = "com.zinerom.info"
         minSdk = 26
         targetSdk = 35
-        versionCode = 325
-        versionName = "3.2.5"
+        versionCode = 324
+        versionName = "3.2.4"
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {
