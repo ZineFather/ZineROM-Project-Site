@@ -15,6 +15,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.work.*
 import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
@@ -62,6 +65,7 @@ class UpdateWorker(ctx:android.content.Context,p:WorkerParameters):CoroutineWork
  val ctx=androidx.compose.ui.platform.LocalContext.current
  val scope=rememberCoroutineScope()
  var tab by remember{mutableStateOf("Home")}
+ var isArabic by remember{mutableStateOf(false)}
  var devices by remember{mutableStateOf(emptyList<Device>())}
  var status by remember{mutableStateOf("Ready")}
  var releaseEntries by remember{mutableStateOf(emptyList<Pair<String,String?>>())}
@@ -77,30 +81,32 @@ class UpdateWorker(ctx:android.content.Context,p:WorkerParameters):CoroutineWork
   }
  }
  MaterialTheme(colorScheme=darkColorScheme(primary=Color(0xFF85BDFF),background=Color(0xFF08111F),surface=Color(0xFF14243A))){
-  Scaffold(containerColor=Color(0xFF08111F),topBar={TopAppBar(title={Text("ZineROM INFO")},colors=TopAppBarDefaults.topAppBarColors(containerColor=Color(0xFF08111F),titleContentColor=Color.White))},bottomBar={
-   NavigationBar(containerColor=Color(0xFF14243A)){listOf("Home","Devices","Updates","Notifications","About").forEach{t->NavigationBarItem(selected=tab==t,onClick={tab=t},icon={Icon(when(t){"Devices"->Icons.Default.PhoneAndroid;"Updates"->Icons.Default.SystemUpdate;"Notifications"->Icons.Default.Notifications;"About"->Icons.Default.Info;else->Icons.Default.Home},t)},label={Text(t)})}}
+  CompositionLocalProvider(LocalLayoutDirection provides if(isArabic) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+  Scaffold(containerColor=Color(0xFF08111F),topBar={TopAppBar(title={Text("ZineROM INFO")},actions={TextButton(onClick={isArabic=!isArabic}){Text(if(isArabic)"EN" else "عربي",color=Color.White)}},colors=TopAppBarDefaults.topAppBarColors(containerColor=Color(0xFF08111F),titleContentColor=Color.White))},bottomBar={
+   NavigationBar(containerColor=Color(0xFF14243A)){listOf("Home","Devices","Updates","Notifications","About").forEach{t->NavigationBarItem(selected=tab==t,onClick={tab=t},icon={Icon(when(t){"Devices"->Icons.Default.PhoneAndroid;"Updates"->Icons.Default.SystemUpdate;"Notifications"->Icons.Default.Notifications;"About"->Icons.Default.Info;else->Icons.Default.Home},t)},label={Text(if(isArabic) when(t){"Home"->"الرئيسية";"Devices"->"الأجهزة";"Updates"->"التحديثات";"Notifications"->"الإشعارات";else->"حول"} else t)})}}
   }){pad->
    when(tab){
     "Devices"->LazyColumn(Modifier.fillMaxSize().padding(pad).padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
-     item{Text("Supported devices",style=MaterialTheme.typography.headlineSmall,color=Color.White)}
+     item{Text(if(isArabic)"الأجهزة المدعومة" else "Supported devices",style=MaterialTheme.typography.headlineSmall,color=Color.White)}
      items(devices){d->ElevatedCard(Modifier.fillMaxWidth(),colors=CardDefaults.elevatedCardColors(containerColor=Color(0xFF14243A))){Column(Modifier.padding(16.dp)){Text(d.name,color=Color.White,style=MaterialTheme.typography.titleMedium);Text(d.model?:"Model not specified",color=Color.LightGray);Text(if(d.versions.isEmpty())"No ROM release listed" else "One UI "+d.versions.joinToString(" · "),color=Color(0xFF85BDFF))}}}
     }
     "Updates"->Column(Modifier.padding(pad).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)){
-     Text("Software updates",style=MaterialTheme.typography.headlineSmall,color=Color.White)
-     Button(onClick={status="Checking…";scope.launch{try{val result=withContext(Dispatchers.IO){val request=Request.Builder().url("https://raw.githubusercontent.com/ZineFather/ZineROM-Project-Site/main/remote/releases.json").build();OkHttpClient().newCall(request).execute().use{response->if(!response.isSuccessful) throw IllegalStateException("HTTP ${response.code}");val a=JSONObject(response.body?.string().orEmpty()).optJSONArray("releases")?:org.json.JSONArray();(0 until a.length()).map{i->val x=a.getJSONObject(i);Pair("${x.optString("title","ZineROM")} · ${x.optString("version")} · ${x.optString("device_id")}",x.optString("download_url").takeIf{u->u.startsWith("https://")})}}};releaseEntries=result;status="Check complete · ${result.size} release(s)"}catch(e:Exception){status="Check failed: ${e.localizedMessage}"}}}){Text("Check now")}
+     Text(if(isArabic)"تحديثات النظام" else "Software updates",style=MaterialTheme.typography.headlineSmall,color=Color.White)
+     Button(onClick={status="Checking…";scope.launch{try{val result=withContext(Dispatchers.IO){val request=Request.Builder().url("https://raw.githubusercontent.com/ZineFather/ZineROM-Project-Site/main/remote/releases.json").build();OkHttpClient().newCall(request).execute().use{response->if(!response.isSuccessful) throw IllegalStateException("HTTP ${response.code}");val a=JSONObject(response.body?.string().orEmpty()).optJSONArray("releases")?:org.json.JSONArray();(0 until a.length()).map{i->val x=a.getJSONObject(i);Pair("${x.optString("title","ZineROM")} · ${x.optString("version")} · ${x.optString("device_id")}",x.optString("download_url").takeIf{u->u.startsWith("https://")})}}};releaseEntries=result;status="Check complete · ${result.size} release(s)"}catch(e:Exception){status="Check failed: ${e.localizedMessage}"}}}){Text(if(isArabic)"تحقق الآن" else "Check now")}
      Text(status,color=Color(0xFF85BDFF))
-     releaseEntries.forEach{entry->ElevatedCard(colors=CardDefaults.elevatedCardColors(containerColor=Color(0xFF14243A))){Column(Modifier.padding(12.dp)){Text(entry.first,color=Color.White);if(entry.second!=null)TextButton(onClick={ctx.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(entry.second)))}){Text("Download release")}}}}
+     releaseEntries.forEach{entry->ElevatedCard(colors=CardDefaults.elevatedCardColors(containerColor=Color(0xFF14243A))){Column(Modifier.padding(12.dp)){Text(entry.first,color=Color.White);if(entry.second!=null)TextButton(onClick={ctx.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(entry.second)))}){Text(if(isArabic)"تحميل الإصدار" else "Download release")}}}}
     }
     "Notifications"->Column(Modifier.fillMaxSize().padding(pad).padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
-     Text("Notifications",color=Color.White,style=MaterialTheme.typography.headlineSmall)
-     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text("Allow ZineROM notifications",color=Color.White);Switch(checked=notificationEnabled,onCheckedChange={value->notificationEnabled=value;ctx.getSharedPreferences("zinerom_notifications",0).edit().putBoolean("enabled",value).apply()})}
-     Text("Recent notification history",color=Color(0xFF85BDFF))
-     if(notificationHistory.isEmpty()) Text("No notifications received yet.",color=Color.LightGray)
+     Text(if(isArabic)"الإشعارات" else "Notifications",color=Color.White,style=MaterialTheme.typography.headlineSmall)
+     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(if(isArabic)"السماح بإشعارات ZineROM" else "Allow ZineROM notifications",color=Color.White);Switch(checked=notificationEnabled,onCheckedChange={value->notificationEnabled=value;ctx.getSharedPreferences("zinerom_notifications",0).edit().putBoolean("enabled",value).apply()})}
+     Text(if(isArabic)"سجل الإشعارات" else "Recent notification history",color=Color(0xFF85BDFF))
+     if(notificationHistory.isEmpty()) Text(if(isArabic)"لا توجد إشعارات حتى الآن." else "No notifications received yet.",color=Color.LightGray)
      notificationHistory.forEach{item->ElevatedCard(colors=CardDefaults.elevatedCardColors(containerColor=Color(0xFF14243A))){Column(Modifier.padding(12.dp)){Text(item.first,color=Color.White);Text(item.second,color=Color.LightGray)}}}
     }
-    "About"->Column(Modifier.padding(pad).padding(20.dp)){Text("About ZineROM Info",color=Color.White,style=MaterialTheme.typography.headlineSmall);Text("Official companion for the ZineROM Project.",color=Color.LightGray);Text("https://zinefather.github.io/ZineROM-Project-Site/",color=Color(0xFF85BDFF))}
-    else->Column(Modifier.padding(pad).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)){Text("ZineROM Info",color=Color.White,style=MaterialTheme.typography.headlineLarge);Text("Your ZineROM project companion",color=Color(0xFF85BDFF),style=MaterialTheme.typography.titleMedium);ElevatedCard(colors=CardDefaults.elevatedCardColors(containerColor=Color(0xFF14243A))){Column(Modifier.padding(18.dp)){Text("${devices.size} supported catalog devices",color=Color.White);Text("Browse ROM versions and device information.",color=Color.LightGray);TextButton(onClick={tab="Devices"}){Text("Browse devices")}}};ElevatedCard(colors=CardDefaults.elevatedCardColors(containerColor=Color(0xFF14243A))){Column(Modifier.padding(18.dp)){Text("Automatic update checks",color=Color.White);Text("Background checks are scheduled approximately every 24 hours.",color=Color.LightGray);TextButton(onClick={tab="Updates"}){Text("Check releases")}}}}
+    "About"->Column(Modifier.padding(pad).padding(20.dp)){Text(if(isArabic)"حول ZineROM Info" else "About ZineROM Info",color=Color.White,style=MaterialTheme.typography.headlineSmall);Text(if(isArabic)"التطبيق الرسمي المصاحب لمشروع ZineROM." else "Official companion for the ZineROM Project.",color=Color.LightGray);Text("https://zinefather.github.io/ZineROM-Project-Site/",color=Color(0xFF85BDFF))}
+    else->Column(Modifier.padding(pad).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)){Text("ZineROM Info",color=Color.White,style=MaterialTheme.typography.headlineLarge);Text(if(isArabic)"رفيقك لمشروع ZineROM" else "Your ZineROM project companion",color=Color(0xFF85BDFF),style=MaterialTheme.typography.titleMedium);ElevatedCard(colors=CardDefaults.elevatedCardColors(containerColor=Color(0xFF14243A))){Column(Modifier.padding(18.dp)){Text("${devices.size} supported catalog devices",color=Color.White);Text(if(isArabic)"تصفح إصدارات الرومات ومعلومات الأجهزة." else "Browse ROM versions and device information.",color=Color.LightGray);TextButton(onClick={tab="Devices"}){Text(if(isArabic)"تصفح الأجهزة" else "Browse devices")}}};ElevatedCard(colors=CardDefaults.elevatedCardColors(containerColor=Color(0xFF14243A))){Column(Modifier.padding(18.dp)){Text(if(isArabic)"فحص التحديثات تلقائياً" else "Automatic update checks",color=Color.White);Text("Background checks are scheduled approximately every 24 hours.",color=Color.LightGray);TextButton(onClick={tab="Updates"}){Text(if(isArabic)"فحص الإصدارات" else "Check releases")}}}}
    }
+  }
   }
  }
 }
