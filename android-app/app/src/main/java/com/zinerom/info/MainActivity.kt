@@ -355,7 +355,16 @@ fun ZineApp() {
                     },
                     dismissButton = {
                         TextButton(onClick = { startupNotice = null }) {
-                            Text(if (arabic) "إغلاق" else "Dismiss")
+                            val notDetected = notice.title.contains("not detected", true) ||
+                                notice.title.contains("غير مكتشفة")
+                            Text(
+                                when {
+                                    notDetected && arabic -> "مش بستخدم ZineROM"
+                                    notDetected -> "Not using ZineROM"
+                                    arabic -> "إغلاق"
+                                    else -> "Dismiss"
+                                }
+                            )
                         }
                     }
                 )
