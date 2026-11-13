@@ -20,15 +20,27 @@ jobs:
         with:
           packages: platform-tools
       - run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
-      - name: Configure Firebase client (optional)
+      - name: Configure and validate Firebase client
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
-          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
-            printf '%s' "$GOOGLE_SERVICES_JSON" > android-app/app/google-services.json
-          else
-            echo "GOOGLE_SERVICES_JSON is not configured; building without FCM client initialization."
+          set -euo pipefail
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::error::GOOGLE_SERVICES_JSON secret is required; refusing to build an APK without Firebase."
+            exit 1
           fi
+          printf '%s' "$GOOGLE_SERVICES_JSON" > android-app/app/google-services.json
+          PROJECT_ID=$(jq -r '.project_info.project_id // empty' android-app/app/google-services.json)
+          PACKAGE_NAME=$(jq -r '.client[]?.client_info.android_client_info.package_name // empty' android-app/app/google-services.json | head -n 1)
+          if [ "$PROJECT_ID" != "zinerom-updates" ]; then
+            echo "::error::Wrong Firebase project in GOOGLE_SERVICES_JSON: expected zinerom-updates, got $PROJECT_ID"
+            exit 1
+          fi
+          if [ "$PACKAGE_NAME" != "com.zinerom.info" ]; then
+            echo "::error::Wrong Firebase Android package: expected com.zinerom.info, got $PACKAGE_NAME"
+            exit 1
+          fi
+          echo "Firebase client validated for $PROJECT_ID / $PACKAGE_NAME."
       - uses: gradle/actions/setup-gradle@v4
         with: {gradle-version: "8.13"}
       - name: Build debug APK
