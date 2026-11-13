@@ -158,7 +158,6 @@
     {
       "id": "s26-ultra",
       "name": "Galaxy S26 Ultra",
-      "model": "SM-S948 family",
       "versions": [],
       "description": "Device profile listed in the ZineROM companion. No verified ZineROM build or compatible module is published here yet."
     }
