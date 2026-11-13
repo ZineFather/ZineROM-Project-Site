@@ -372,6 +372,28 @@ private fun readDevices(context: Context): List<Device> {
     }
 }
 
+private fun readModuleCatalog(context: Context, devices: List<Device>): List<ModuleCatalogItem> {
+    val root = JSONObject(context.assets.open("devices.json").bufferedReader().use { it.readText() })
+    val result = mutableListOf<ModuleCatalogItem>()
+    devices.forEach { device ->
+        device.modules.forEachIndexed { index, module ->
+            result += ModuleCatalogItem(device.id + "-" + index, module.title, module.description, module.version, module.assetPath, device.name, device)
+        }
+    }
+    val entries = root.optJSONArray("modules")
+    if (entries != null) for (index in 0 until entries.length()) {
+        val item = entries.optJSONObject(index) ?: continue
+        val asset = item.optString("asset_path").takeIf { it.startsWith("modules/") && !it.contains("..") }
+        val device = devices.firstOrNull { it.id == item.optString("device_id") }
+        result += ModuleCatalogItem(
+            item.optString("id", "standalone-" + index), item.optString("title", "ZineROM module"),
+            item.optString("description").takeIf { it.isNotBlank() }, item.optString("version").takeIf { it.isNotBlank() },
+            asset, item.optString("device_name").ifBlank { device?.name ?: "General profile" }, device
+        )
+    }
+    return result
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 private data class MainTab(val route: String, val label: String, val arabicLabel: String, val icon: ImageVector)
 
