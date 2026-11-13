@@ -2,5 +2,6 @@
   "version": "3.2.4",
   "download_url": "",
   "changelog_url": "https://t.me/ZineROMProject/13/4542",
-  "notes": "Current baseline for testing. Set version to 3.2.5 and add the direct APK URL when the APK is published."
+  "notes": "Latest supported ZineROM build version. Compare this value with the installed Android Build Number.",
+  "latest_rom_version": "3.2.5"
 }
