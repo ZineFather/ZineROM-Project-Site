@@ -65,7 +65,11 @@ class UpdateWorker(ctx:android.content.Context,p:WorkerParameters):CoroutineWork
  var devices by remember{mutableStateOf(emptyList<Device>())}
  var status by remember{mutableStateOf("Ready")}
  var releaseEntries by remember{mutableStateOf(emptyList<Pair<String,String?>>())}
+ var notificationEnabled by remember{mutableStateOf(ctx.getSharedPreferences("zinerom_notifications",0).getBoolean("enabled",true))}
+ var notificationHistory by remember{mutableStateOf(emptyList<Pair<String,String>>())}
  LaunchedEffect(Unit){
+  val prefs=ctx.getSharedPreferences("zinerom_notifications",0)
+  notificationHistory=try{val a=org.json.JSONArray(prefs.getString("history","[]"));(0 until a.length()).map{i->val x=a.getJSONObject(i);Pair(x.optString("title"),x.optString("message"))}}catch(_:Exception){emptyList()}
   devices=withContext(Dispatchers.IO){
    val root=JSONObject(ctx.assets.open("devices.json").bufferedReader().use{it.readText()})
    val a=root.getJSONArray("devices")
@@ -74,7 +78,7 @@ class UpdateWorker(ctx:android.content.Context,p:WorkerParameters):CoroutineWork
  }
  MaterialTheme(colorScheme=darkColorScheme(primary=Color(0xFF85BDFF),background=Color(0xFF08111F),surface=Color(0xFF14243A))){
   Scaffold(containerColor=Color(0xFF08111F),topBar={TopAppBar(title={Text("ZineROM INFO")},colors=TopAppBarDefaults.topAppBarColors(containerColor=Color(0xFF08111F),titleContentColor=Color.White))},bottomBar={
-   NavigationBar(containerColor=Color(0xFF14243A)){listOf("Home","Devices","Updates","About").forEach{t->NavigationBarItem(selected=tab==t,onClick={tab=t},icon={Icon(when(t){"Devices"->Icons.Default.PhoneAndroid;"Updates"->Icons.Default.SystemUpdate;"About"->Icons.Default.Info;else->Icons.Default.Home},t)},label={Text(t)})}}
+   NavigationBar(containerColor=Color(0xFF14243A)){listOf("Home","Devices","Updates","Notifications","About").forEach{t->NavigationBarItem(selected=tab==t,onClick={tab=t},icon={Icon(when(t){"Devices"->Icons.Default.PhoneAndroid;"Updates"->Icons.Default.SystemUpdate;"Notifications"->Icons.Default.Notifications;"About"->Icons.Default.Info;else->Icons.Default.Home},t)},label={Text(t)})}}
   }){pad->
    when(tab){
     "Devices"->LazyColumn(Modifier.fillMaxSize().padding(pad).padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
@@ -86,6 +90,13 @@ class UpdateWorker(ctx:android.content.Context,p:WorkerParameters):CoroutineWork
      Button(onClick={status="Checking…";scope.launch{try{val result=withContext(Dispatchers.IO){val request=Request.Builder().url("https://raw.githubusercontent.com/ZineFather/ZineROM-Project-Site/main/remote/releases.json").build();OkHttpClient().newCall(request).execute().use{response->if(!response.isSuccessful) throw IllegalStateException("HTTP ${response.code}");val a=JSONObject(response.body?.string().orEmpty()).optJSONArray("releases")?:org.json.JSONArray();(0 until a.length()).map{i->val x=a.getJSONObject(i);Pair("${x.optString("title","ZineROM")} · ${x.optString("version")} · ${x.optString("device_id")}",x.optString("download_url").takeIf{u->u.startsWith("https://")})}}};releaseEntries=result;status="Check complete · ${result.size} release(s)"}catch(e:Exception){status="Check failed: ${e.localizedMessage}"}}}){Text("Check now")}
      Text(status,color=Color(0xFF85BDFF))
      releaseEntries.forEach{entry->ElevatedCard(colors=CardDefaults.elevatedCardColors(containerColor=Color(0xFF14243A))){Column(Modifier.padding(12.dp)){Text(entry.first,color=Color.White);if(entry.second!=null)TextButton(onClick={ctx.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(entry.second)))}){Text("Download release")}}}}
+    }
+    "Notifications"->Column(Modifier.fillMaxSize().padding(pad).padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
+     Text("Notifications",color=Color.White,style=MaterialTheme.typography.headlineSmall)
+     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text("Allow ZineROM notifications",color=Color.White);Switch(checked=notificationEnabled,onCheckedChange={value->notificationEnabled=value;ctx.getSharedPreferences("zinerom_notifications",0).edit().putBoolean("enabled",value).apply()})}
+     Text("Recent notification history",color=Color(0xFF85BDFF))
+     if(notificationHistory.isEmpty()) Text("No notifications received yet.",color=Color.LightGray)
+     notificationHistory.forEach{item->ElevatedCard(colors=CardDefaults.elevatedCardColors(containerColor=Color(0xFF14243A))){Column(Modifier.padding(12.dp)){Text(item.first,color=Color.White);Text(item.second,color=Color.LightGray)}}}
     }
     "About"->Column(Modifier.padding(pad).padding(20.dp)){Text("About ZineROM Info",color=Color.White,style=MaterialTheme.typography.headlineSmall);Text("Official companion for the ZineROM Project.",color=Color.LightGray);Text("https://zinefather.github.io/ZineROM-Project-Site/",color=Color(0xFF85BDFF))}
     else->Column(Modifier.padding(pad).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)){Text("ZineROM Info",color=Color.White,style=MaterialTheme.typography.headlineLarge);Text("Your ZineROM project companion",color=Color(0xFF85BDFF),style=MaterialTheme.typography.titleMedium);ElevatedCard(colors=CardDefaults.elevatedCardColors(containerColor=Color(0xFF14243A))){Column(Modifier.padding(18.dp)){Text("${devices.size} supported catalog devices",color=Color.White);Text("Browse ROM versions and device information.",color=Color.LightGray);TextButton(onClick={tab="Devices"}){Text("Browse devices")}}};ElevatedCard(colors=CardDefaults.elevatedCardColors(containerColor=Color(0xFF14243A))){Column(Modifier.padding(18.dp)){Text("Automatic update checks",color=Color.White);Text("Background checks are scheduled approximately every 24 hours.",color=Color.LightGray);TextButton(onClick={tab="Updates"}){Text("Check releases")}}}}

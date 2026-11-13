@@ -9,9 +9,11 @@ import org.json.JSONObject
 
 class ZineFirebaseMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
+        val preferences = getSharedPreferences("zinerom_notifications", MODE_PRIVATE)
+        if (!preferences.getBoolean("enabled", true)) return
         val title = message.data["title"] ?: message.notification?.title ?: "ZineROM"
         val body = message.data["message"] ?: message.notification?.body.orEmpty()
-        val prefs = getSharedPreferences("zinerom_notifications", MODE_PRIVATE)
+        val prefs = preferences
         val history = try { org.json.JSONArray(prefs.getString("history", "[]")) } catch (_: Exception) { org.json.JSONArray() }
         val item = JSONObject().put("title", title).put("message", body)
             .put("type", message.data["type"] ?: "CUSTOM")
