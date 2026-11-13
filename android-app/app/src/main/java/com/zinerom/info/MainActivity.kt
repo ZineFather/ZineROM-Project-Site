@@ -422,9 +422,9 @@ fun ZineApp() {
 
     val tabs = listOf(
         MainTab("home", "Home", "الرئيسية", Icons.Default.Home),
-        MainTab("superuser", "Superuser", "سوبر يوزر", Icons.Default.AdminPanelSettings),
+        MainTab("devices", "Devices", "الأجهزة", Icons.Default.Devices),
         MainTab("modules", "Modules", "الموديولات", Icons.Default.Extension),
-        MainTab("settings", "Settings", "الإعدادات", Icons.Default.Settings)
+        MainTab("updates", "Updates", "التحديثات", Icons.Default.SystemUpdate)
     )
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route ?: "home"
@@ -528,6 +528,11 @@ fun ZineApp() {
                             }
                         },
                         actions = {
+                            IconButton(onClick = {
+                                navController.navigate("settings") { launchSingleTop = true }
+                            }) {
+                                Icon(Icons.Default.Settings, contentDescription = if (arabic) "الإعدادات" else "Settings", tint = Blue)
+                            }
                             TextButton(onClick = { arabic = !arabic }) {
                                 Text(if (arabic) "EN" else "عربي", color = Blue, fontWeight = FontWeight.Bold)
                             }
@@ -536,20 +541,22 @@ fun ZineApp() {
                     )
                 },
                 bottomBar = {
-                    ZineBottomBar(
-                        tabs = tabs,
-                        selectedRoute = currentRoute,
-                        arabic = arabic,
-                        onSelect = { route ->
-                            navController.navigate(route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
+                    if (currentRoute != "settings") {
+                        ZineBottomBar(
+                            tabs = tabs,
+                            selectedRoute = currentRoute,
+                            arabic = arabic,
+                            onSelect = { route ->
+                                navController.navigate(route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
                                 }
-                                launchSingleTop = true
-                                restoreState = true
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             ) { innerPadding ->
                 NavHost(
@@ -564,9 +571,6 @@ fun ZineApp() {
                             onUpdates = { navController.navigate("updates") },
                             onDevice = { selectedDevice = it; navController.navigate("devices") }
                         )
-                    }
-                    composable("superuser") {
-                        SuperuserScreen(arabic = arabic, modifier = Modifier.fillMaxSize())
                     }
                     composable("modules") {
                         ModulesScreen(
@@ -1125,40 +1129,6 @@ private fun DeviceAssetImage(
     } else {
         Box(modifier.background(Color(0xFF171717)), contentAlignment = Alignment.Center) {
             Icon(Icons.Default.PhoneAndroid, contentDescription = null, tint = Color(0xFF6D829A), modifier = Modifier.size(34.dp))
-        }
-    }
-}
-
-@Composable
-private fun SuperuserScreen(arabic: Boolean, modifier: Modifier = Modifier) {
-    val paths = remember { listOf("/system/bin/su", "/system/xbin/su", "/sbin/su", "/debug_ramdisk/su", "/vendor/bin/su") }
-    val detected = remember { paths.any { File(it).exists() } }
-    LazyColumn(modifier, contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        item {
-            Text(if (arabic) "Superuser" else "Superuser", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
-            Text(if (arabic) "معلومات حالة صلاحيات الروت على الجهاز." else "A local, read-only overview of root availability.", color = Color(0xFF9AAABD), fontSize = 12.sp)
-        }
-        item {
-            GlassPanel {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Icon(Icons.Default.AdminPanelSettings, contentDescription = null, tint = Blue, modifier = Modifier.size(28.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(if (detected) (if (arabic) "تم العثور على ملف su" else "su binary detected") else (if (arabic) "لم يتم العثور على ملف su" else "No su binary detected"),
-                            color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        Text(if (arabic) "فحص محلي فقط — لا يتم طلب صلاحيات أو تنفيذ أوامر." else "Read-only check. The app does not request root or execute commands.",
-                            color = Color(0xFF9AAABD), fontSize = 11.sp, lineHeight = 17.sp)
-                    }
-                    Icon(if (detected) Icons.Default.CheckCircle else Icons.Default.Info, contentDescription = null,
-                        tint = if (detected) Color(0xFF75D6A0) else Color(0xFFFFC477))
-                }
-            }
-        }
-        item {
-            GlassPanel {
-                Text(if (arabic) "ملاحظة" else "NOTE", color = Blue, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                Text(if (arabic) "وجود ملف su لا يثبت أن تطبيقات الروت لديها صلاحية Superuser. راجع مدير Magisk أو KernelSU لمنح الصلاحيات يدويًا." else "Finding an su file does not prove that apps have Superuser permission. Manage app grants directly in Magisk or KernelSU.",
-                    color = Color(0xFF9AAABD), fontSize = 12.sp, lineHeight = 19.sp)
-            }
         }
     }
 }
