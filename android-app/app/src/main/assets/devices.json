@@ -1,5 +1,5 @@
 {
- "website":"https://zinefather.github.io/ZINE-ROM-Project-Site/",
+ "website":"https://zinefather.github.io/ZineROM-Project-Site/",
  "devices":[
   {"id":"a15-4g","name":"Galaxy A15 4G","model":"SM-A155F","versions":["9.0"]},
   {"id":"a15-5g","name":"Galaxy A15 5G","model":null,"versions":[]},
