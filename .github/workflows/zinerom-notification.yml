@@ -89,19 +89,59 @@ jobs:
           BUTTON_TEXT: ${{ inputs.button_text }}
           BUTTON_URL: ${{ inputs.button_url }}
         run: |
+          TOPIC="zinerom_all"
           case "$TARGET" in
-            ALL) TOPIC="zinerom_all" ;;
-            A52S) TOPIC="zinerom_a52s-5g" ;;
-            A53) TOPIC="zinerom_a53-5g" ;;
-            A34) TOPIC="zinerom_a34-5g" ;;
-            A25) TOPIC="zinerom_a25-5g" ;;
-            A15) TOPIC="zinerom_a15-4g" ;;
-            A16) TOPIC="zinerom_a16-4g" ;;
-            A11) TOPIC="zinerom_a11-4g" ;;
-            A24) TOPIC="zinerom_a24-4g" ;;
-            TAB_A9_PLUS) TOPIC="zinerom_tab-a9-plus-5g-x216b" ;;
+            ALL) TARGET_LABEL="All devices" ;;
+            A52S) TARGET_LABEL="Galaxy A52s 5G (A52S)" ;;
+            A53) TARGET_LABEL="Galaxy A53 5G (A53)" ;;
+            A34) TARGET_LABEL="Galaxy A34 5G (A34)" ;;
+            A25) TARGET_LABEL="Galaxy A25 5G (A25)" ;;
+            A15) TARGET_LABEL="Galaxy A15 4G (A15)" ;;
+            A16) TARGET_LABEL="Galaxy A16 4G (A16)" ;;
+            A11) TARGET_LABEL="Galaxy A11 (A11)" ;;
+            A24) TARGET_LABEL="Galaxy A24 (A24)" ;;
+            TAB_A9_PLUS) TARGET_LABEL="Galaxy Tab A9+ 5G (TAB_A9_PLUS)" ;;
             *) echo "::error::Unsupported target: $TARGET"; exit 1 ;;
           esac
+          DISPLAY_MESSAGE="$MESSAGE"
+
+          case "$BUTTON_URL" in
+            https://*) ;;
+            *) echo "::error::button_url must start with https://"; exit 1 ;;
+          esac
+
+          PAYLOAD=$(jq -n \
+            --arg topic "$TOPIC" \
+            --arg title "$TITLE" \
+            --arg message "$DISPLAY_MESSAGE" \
+            --arg target_device "$TARGET_LABEL" \
+            --arg type "$NOTICE_TYPE" \
+            --arg version "$TARGET_VERSION" \
+            --arg button_text "$BUTTON_TEXT" \
+            --arg button_url "$BUTTON_URL" \
+            '{
+              message: {
+                topic: $topic,
+                data: {
+                  title: $title,
+                  message: $message,
+                  type: $type,
+                  target_version: $version,\n                  target_device: $target_device,
+                  button_text: $button_text,
+                  button_url: $button_url
+                },
+                android: { priority: "HIGH" }
+              }
+            }')
+
+          curl --fail-with-body --silent --show-error \
+            -X POST "https://fcm.googleapis.com/v1/projects/$PROJECT_ID/messages:send" \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Content-Type: application/json; charset=UTF-8" \
+            -d "$PAYLOAD"
+
+          echo "Notification sent to all app installs via topic: $TOPIC (target: $TARGET_LABEL)"
+\n\n'"Target device: $TARGET_LABEL"
 
           case "$BUTTON_URL" in
             https://*) ;;
