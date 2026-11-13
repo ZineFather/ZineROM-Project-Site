@@ -73,7 +73,8 @@ jobs:
           ZINEROM_SIGNING_KEY_PASSWORD: ${{ secrets.ZINEROM_SIGNING_KEY_PASSWORD }}
         run: |
           if [ -z "$ZINEROM_SIGNING_KEYSTORE_BASE64" ] || [ -z "$ZINEROM_SIGNING_STORE_PASSWORD" ] || [ -z "$ZINEROM_SIGNING_KEY_ALIAS" ] || [ -z "$ZINEROM_SIGNING_KEY_PASSWORD" ]; then
-            echo "::warning::Stable signing secrets are incomplete; this debug APK will use the runner's temporary debug certificate and is not suitable for in-place upgrades."
+            echo "::error::Stable signing secrets are required. Refusing to create an APK with a temporary debug certificate that cannot safely update the installed app."
+            exit 1
           fi
           gradle --no-daemon clean assembleDebug
         working-directory: android-app
