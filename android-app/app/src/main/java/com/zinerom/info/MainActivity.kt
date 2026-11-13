@@ -441,9 +441,6 @@ fun ZineApp() {
                                 scope.launch {
                                     try {
                                         val source = config ?: readConfig(context)
-                                        val result = withContext(Dispatchers.IO) {
-                                            fetchAppUpdate(source.updateJsonUrl)
-                                        }
                                         val romBuild = withContext(Dispatchers.IO) {
                                             runCatching { readRomBuildInfo() }.getOrNull()
                                         }
