@@ -1,0 +1,10 @@
+{
+  "website_url": "https://zinefather.github.io/ZineROM-Project-Site/",
+  "releases_url": "https://raw.githubusercontent.com/ZineFather/ZineROM-Project-Site/zinerom-info-development/remote/releases.json",
+  "telegram_url": "https://t.me/ZineROMProject/13/4542",
+  "changelog_url": "https://t.me/ZineROMProject/13/4542",
+  "workflow_url": "https://github.com/ZineFather/ZineROM-Project-Site/actions/workflows/zinerom-info-android.yml",
+  "github_repo": "https://github.com/ZineFather/ZineROM-Project-Site",
+  "github_branch": "zinerom-info-development",
+  "app_version": "3.2.5"
+}
