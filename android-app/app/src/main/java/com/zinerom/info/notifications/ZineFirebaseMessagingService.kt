@@ -96,7 +96,7 @@ class ZineFirebaseMessagingService : FirebaseMessagingService() {
         // Deliberately omit a large icon: never reuse the coloured launcher/app artwork here.
 
         val notification = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(R.drawable.ic_stat_zinerom)
+            .setSmallIcon(R.drawable.ic_notification_zinerom)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
