@@ -65,12 +65,14 @@ jobs:
         with:
           gradle-version: "8.13"
 
-      - name: Checkout ZineROM platform signing certificate
-        uses: actions/checkout@v4
-        with:
-          repository: ZineFather/ZineROM8.5-A52s
-          ref: seventeen-s26u
-          path: rom-source
+      - name: Fetch ZineROM platform signing certificate
+        run: |
+          set -euo pipefail
+          mkdir -p rom-signing
+          curl -fsSL https://raw.githubusercontent.com/ZineFather/ZineROM8.5-A52s/seventeen-s26u/security/aosp_platform.pk8 -o rom-signing/aosp_platform.pk8
+          curl -fsSL https://raw.githubusercontent.com/ZineFather/ZineROM8.5-A52s/seventeen-s26u/security/aosp_platform.x509.pem -o rom-signing/aosp_platform.x509.pem
+          test -s rom-signing/aosp_platform.pk8
+          test -s rom-signing/aosp_platform.x509.pem
 
       - name: Build unsigned release APK
         run: gradle --no-daemon clean assembleRelease
@@ -85,8 +87,8 @@ jobs:
           ALIGNED="android-app/app/build/outputs/apk/release/ZineROM-Info-aligned.apk"
           SIGNED="android-app/app/build/outputs/apk/release/ZineROM-Info-3.2.7.apk"
           test -s "$UNSIGNED"
-          test -s "rom-source/security/aosp_platform.pk8"
-          test -s "rom-source/security/aosp_platform.x509.pem"
+          test -s "rom-signing/aosp_platform.pk8"
+          test -s "rom-signing/aosp_platform.x509.pem"
           "$BUILD_TOOLS/zipalign" -f -p 4 "$UNSIGNED" "$ALIGNED"
           "$BUILD_TOOLS/apksigner" sign --key rom-source/security/aosp_platform.pk8 --cert rom-source/security/aosp_platform.x509.pem --out "$SIGNED" "$ALIGNED"
           "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$SIGNED"
