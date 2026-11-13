@@ -61,7 +61,7 @@ import androidx.core.content.ContextCompat
 private const val DEFAULT_TELEGRAM = "https://t.me/ZineROMProject/13/4542"
 private const val DEFAULT_WEBSITE = "https://zinefather.github.io/ZineROM-Project-Site/"
 private const val NOTIFICATION_CHANNEL = "zinerom_alerts_v2"
-private const val CURRENT_APP_VERSION = "3.2.5"
+private const val CURRENT_APP_VERSION = "3.2.6"
 private const val DEFAULT_UPDATE_JSON =
     "https://raw.githubusercontent.com/ZineFather/ZineROM-Project-Site/zinerom-info-development/remote/update.json"
 private val httpClient = OkHttpClient()
@@ -311,7 +311,6 @@ fun ZineApp() {
                         selectedRoute = currentRoute,
                         arabic = arabic,
                         onSelect = { route ->
-                            selectedDevice = null
                             navController.navigate(route) {
                                 popUpTo(navController.graph.findStartDestination().id) {
                                     saveState = true
@@ -331,7 +330,7 @@ fun ZineApp() {
                     composable("home") {
                         HomeScreen(
                             devices, arabic, Modifier.fillMaxSize(),
-                            onBrowse = { navController.navigate("devices") },
+                            onBrowse = { selectedDevice = null; navController.navigate("devices") },
                             onUpdates = { navController.navigate("updates") },
                             onDevice = { selectedDevice = it; navController.navigate("devices") }
                         )
