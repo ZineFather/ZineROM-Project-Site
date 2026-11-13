@@ -86,9 +86,11 @@ data class AppUpdate(
 data class UpdateCheckResult(val update: AppUpdate?, val hasTargetRules: Boolean)
 data class StartupNotice(val title: String, val message: String, val url: String, val action: String)
 data class Rom(val title: String, val version: String, val downloadUrl: String)
+data class DeviceModule(val title: String, val description: String?, val version: String?, val downloadUrl: String)
 data class Device(
     val id: String, val name: String, val model: String?, val versions: List<String>,
-    val imageUrl: String?, val description: String?, val downloadUrl: String?, val roms: List<Rom>
+    val imageUrl: String?, val description: String?, val downloadUrl: String?, val roms: List<Rom>,
+    val modules: List<DeviceModule>
 )
 data class Release(val title: String, val version: String, val deviceId: String, val downloadUrl: String?)
 
@@ -299,6 +301,18 @@ private fun readDevices(context: Context): List<Device> {
             val entry = romArray.getJSONObject(n)
             Rom(entry.optString("title"), entry.optString("version"), entry.optString("download_url"))
         }
+        val moduleArray = item.optJSONArray("modules")
+        val modules = if (moduleArray == null) emptyList() else (0 until moduleArray.length()).mapNotNull { n ->
+            val entry = moduleArray.optJSONObject(n) ?: return@mapNotNull null
+            val url = entry.optString("download_url")
+            if (!url.startsWith("https://")) return@mapNotNull null
+            DeviceModule(
+                title = entry.optString("title", "Device module"),
+                description = entry.optString("description").takeIf { it.isNotBlank() },
+                version = entry.optString("version").takeIf { it.isNotBlank() },
+                downloadUrl = url
+            )
+        }
         Device(
             id = item.getString("id"),
             name = item.getString("name"),
@@ -307,7 +321,8 @@ private fun readDevices(context: Context): List<Device> {
             imageUrl = item.optString("image_url").takeIf { it.startsWith("https://") },
             description = item.optString("description"),
             downloadUrl = item.optString("download_url").takeIf { it.startsWith("https://") },
-            roms = roms
+            roms = roms,
+            modules = modules
         )
     }
 }
@@ -372,7 +387,7 @@ fun ZineApp() {
                 startupNotice = StartupNotice(
                     title = if (arabic) "تحديث ZineROM متاح" else "ZineROM update available",
                     message = if (arabic)
-                        "الإصدار المثبت ${romBuild.version}، وأحدث إصدار ${remoteVersion}. افتح الموقع للحصول على التحديث."
+                        "الإصدار المثبت ${romBuild.version}، والحد الأدنى المطلوب ${MIN_REQUIRED_APP_VERSION}. افتح الموقع للحصول على التحديث."
                     else
                         "Your ROM build ${romBuild.version} is older than 3.2.5. Open the website to find and download the latest build.",
                     url = loadedConfig?.websiteUrl?.takeIf { it.startsWith("https://") } ?: DEFAULT_WEBSITE,
@@ -969,6 +984,20 @@ private fun DeviceDetails(device: Device, arabic: Boolean, modifier: Modifier, o
             item { TextButton(onClick = { onDownload(device.downloadUrl) }, modifier = Modifier.fillMaxWidth()) {
                 Text(if (arabic) "كل تفاصيل الجهاز على الموقع" else "Full device page on website", color = Blue)
             } }
+        }
+        if (device.modules.isNotEmpty()) {
+            item { SectionHeading(if (arabic) "الموديولات" else "Device modules", if (arabic) "موديولات مخصصة لهذا الجهاز" else "Modules listed for this device") }
+            items(device.modules, key = { it.title + it.downloadUrl }) { module ->
+                GlassPanel {
+                    Text(module.title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    module.version?.let { Text("Version $it", color = Blue, fontSize = 11.sp) }
+                    module.description?.let { Text(it, color = Color(0xFF9AAABD), fontSize = 12.sp, lineHeight = 18.sp) }
+                    Button(onClick = { onDownload(module.downloadUrl) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = Blue, contentColor = Color(0xFF07111D))) {
+                        Icon(Icons.Default.Download, contentDescription = null); Spacer(Modifier.width(8.dp))
+                        Text(if (arabic) "تحميل الموديول" else "Download module", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
         }
     }
 }
