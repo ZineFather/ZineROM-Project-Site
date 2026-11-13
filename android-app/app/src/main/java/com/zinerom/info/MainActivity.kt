@@ -9,6 +9,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -62,6 +64,7 @@ class UpdateWorker(ctx:android.content.Context,p:WorkerParameters):CoroutineWork
  var tab by remember{mutableStateOf("Home")}
  var devices by remember{mutableStateOf(emptyList<Device>())}
  var status by remember{mutableStateOf("Ready")}
+ var releaseEntries by remember{mutableStateOf(emptyList<Pair<String,String?>>())}
  LaunchedEffect(Unit){
   devices=withContext(Dispatchers.IO){
    val root=JSONObject(ctx.assets.open("devices.json").bufferedReader().use{it.readText()})
@@ -80,8 +83,9 @@ class UpdateWorker(ctx:android.content.Context,p:WorkerParameters):CoroutineWork
     }
     "Updates"->Column(Modifier.padding(pad).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)){
      Text("Software updates",style=MaterialTheme.typography.headlineSmall,color=Color.White)
-     Button(onClick={status="Checking…";scope.launch{status=withContext(Dispatchers.IO){try{val r=Request.Builder().url("https://raw.githubusercontent.com/ZineFather/ZineROM-Project-Site/main/remote/releases.json").build();OkHttpClient().newCall(r).execute().use{if(it.isSuccessful)"Release feed reached successfully" else "Feed returned HTTP ${it.code}"}}catch(e:Exception){"Check failed: ${e.localizedMessage}"}}}}){Text("Check now")}
+     Button(onClick={status="Checking…";scope.launch{try{val result=withContext(Dispatchers.IO){val request=Request.Builder().url("https://raw.githubusercontent.com/ZineFather/ZineROM-Project-Site/main/remote/releases.json").build();OkHttpClient().newCall(request).execute().use{response->if(!response.isSuccessful) throw IllegalStateException("HTTP ${response.code}");val a=JSONObject(response.body?.string().orEmpty()).optJSONArray("releases")?:org.json.JSONArray();(0 until a.length()).map{i->val x=a.getJSONObject(i);Pair("${x.optString("title","ZineROM")} · ${x.optString("version")} · ${x.optString("device_id")}",x.optString("download_url").takeIf{u->u.startsWith("https://")})}}};releaseEntries=result;status="Check complete · ${result.size} release(s)"}catch(e:Exception){status="Check failed: ${e.localizedMessage}"}}}){Text("Check now")}
      Text(status,color=Color(0xFF85BDFF))
+     releaseEntries.forEach{entry->ElevatedCard(colors=CardDefaults.elevatedCardColors(containerColor=Color(0xFF14243A))){Column(Modifier.padding(12.dp)){Text(entry.first,color=Color.White);if(entry.second!=null)TextButton(onClick={ctx.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(entry.second)))}){Text("Download release")}}}}
     }
     "About"->Column(Modifier.padding(pad).padding(20.dp)){Text("About ZineROM Info",color=Color.White,style=MaterialTheme.typography.headlineSmall);Text("Official companion for the ZineROM Project.",color=Color.LightGray);Text("https://zinefather.github.io/ZineROM-Project-Site/",color=Color(0xFF85BDFF))}
     else->Column(Modifier.padding(pad).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)){Text("ZineROM Info",color=Color.White,style=MaterialTheme.typography.headlineLarge);Text("Your ZineROM project companion",color=Color(0xFF85BDFF),style=MaterialTheme.typography.titleMedium);ElevatedCard(colors=CardDefaults.elevatedCardColors(containerColor=Color(0xFF14243A))){Column(Modifier.padding(18.dp)){Text("${devices.size} supported catalog devices",color=Color.White);Text("Browse ROM versions and device information.",color=Color.LightGray);TextButton(onClick={tab="Devices"}){Text("Browse devices")}}};ElevatedCard(colors=CardDefaults.elevatedCardColors(containerColor=Color(0xFF14243A))){Column(Modifier.padding(18.dp)){Text("Automatic update checks",color=Color.White);Text("Background checks are scheduled approximately every 24 hours.",color=Color.LightGray);TextButton(onClick={tab="Updates"}){Text("Check releases")}}}}
