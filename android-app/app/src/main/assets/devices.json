@@ -1,16 +1,152 @@
 {
- "website":"https://zinefather.github.io/ZineROM-Project-Site/",
- "devices":[
-  {"id":"a15-4g","name":"Galaxy A15 4G","model":"SM-A155F","versions":["9.0"]},
-  {"id":"a15-5g","name":"Galaxy A15 5G","model":null,"versions":[]},
-  {"id":"a16-4g","name":"Galaxy A16 4G","model":"SM-A165F","versions":["9.0"]},
-  {"id":"a16-5g","name":"Galaxy A16 5G","model":null,"versions":["9.0"]},
-  {"id":"a25-5g","name":"Galaxy A25 5G","model":"SM-A256 family","versions":["8.5"]},
-  {"id":"a34-5g","name":"Galaxy A34 5G","model":"SM-A346 family","versions":["9.0"]},
-  {"id":"a53-5g","name":"Galaxy A53 5G","model":"SM-A536 family","versions":["8.5"]},
-  {"id":"a52s-5g","name":"Galaxy A52s 5G","model":"SM-A528 family","versions":["5.1","6.1","7.0"]},
-  {"id":"a11-4g","name":"Galaxy A11","model":"SM-A115F","versions":["7.0"]},
-  {"id":"a24-4g","name":"Galaxy A24","model":"SM-A245F","versions":["9.0"]},
-  {"id":"tab-a9-plus-5g-x216b","name":"Galaxy Tab A9+ 5G","model":"SM-X216B","versions":[]}
- ]
+  "website": "https://zinefather.github.io/ZineROM-Project-Site/",
+  "devices": [
+    {
+      "id": "a15-4g",
+      "name": "Galaxy A15 4G",
+      "model": "SM-A155F",
+      "versions": [
+        "9.0"
+      ],
+      "image_url": "https://zinefather.github.io/ZineROM-Project-Site/device-images/a15-4g.png",
+      "description": "ZineROM One UI 9 based on the Galaxy S23 platform.",
+      "download_url": "https://gofile.io/d/ZHoAfVo3",
+      "roms": [
+        {
+          "title": "ZineROM One UI 9 (S23 base)",
+          "version": "9.0",
+          "download_url": "https://gofile.io/d/ZHoAfVo3"
+        }
+      ]
+    },
+    {
+      "id": "a15-5g",
+      "name": "Galaxy A15 5G",
+      "model": "SM-A156 family",
+      "versions": [],
+      "image_url": "https://zinefather.github.io/ZineROM-Project-Site/device-images/a15-5g.png",
+      "description": "Check the official ZineROM website for current support and releases.",
+      "download_url": "https://zinefather.github.io/ZineROM-Project-Site/"
+    },
+    {
+      "id": "a16-4g",
+      "name": "Galaxy A16 4G",
+      "model": "SM-A165F",
+      "versions": [
+        "9.0"
+      ],
+      "image_url": "https://zinefather.github.io/ZineROM-Project-Site/device-images/a16-4g.png",
+      "description": "Check the official ZineROM website for supported builds.",
+      "download_url": "https://zinefather.github.io/ZineROM-Project-Site/"
+    },
+    {
+      "id": "a16-5g",
+      "name": "Galaxy A16 5G",
+      "model": "SM-A166 family",
+      "versions": [
+        "9.0"
+      ],
+      "image_url": "https://zinefather.github.io/ZineROM-Project-Site/device-images/a16-5g.png",
+      "description": "Check the official ZineROM website for supported builds.",
+      "download_url": "https://zinefather.github.io/ZineROM-Project-Site/"
+    },
+    {
+      "id": "a25-5g",
+      "name": "Galaxy A25 5G",
+      "model": "SM-A256 family",
+      "versions": [
+        "8.5"
+      ],
+      "image_url": "https://zinefather.github.io/ZineROM-Project-Site/device-images/a25-5g.png",
+      "description": "ZineROM One UI 8.5 based on the Galaxy S23 FE.",
+      "download_url": "https://gofile.io/d/0bGtzT0F",
+      "roms": [
+        {
+          "title": "ZineROM One UI 8.5 (S23 FE base)",
+          "version": "8.5",
+          "download_url": "https://gofile.io/d/0bGtzT0F"
+        }
+      ]
+    },
+    {
+      "id": "a34-5g",
+      "name": "Galaxy A34 5G",
+      "model": "SM-A346 family",
+      "versions": [
+        "9.0"
+      ],
+      "image_url": "https://zinefather.github.io/ZineROM-Project-Site/device-images/a34-5g.png",
+      "description": "ZineROM One UI 9 based on the Galaxy S23 platform.",
+      "download_url": "https://gofile.io/d/dLVF6Yf",
+      "roms": [
+        {
+          "title": "ZineROM One UI 9 (S23 base)",
+          "version": "9.0",
+          "download_url": "https://gofile.io/d/dLVF6Yf"
+        }
+      ]
+    },
+    {
+      "id": "a53-5g",
+      "name": "Galaxy A53 5G",
+      "model": "SM-A536 family",
+      "versions": [
+        "8.5"
+      ],
+      "image_url": "https://zinefather.github.io/ZineROM-Project-Site/device-images/a53-5g.png",
+      "description": "ZineROM One UI 8.5 based on the Galaxy S23 FE.",
+      "download_url": "https://gofile.io/d/3ZUAmnvR",
+      "roms": [
+        {
+          "title": "ZineROM One UI 8.5 (S23 FE base)",
+          "version": "8.5",
+          "download_url": "https://gofile.io/d/3ZUAmnvR"
+        }
+      ]
+    },
+    {
+      "id": "a52s-5g",
+      "name": "Galaxy A52s 5G",
+      "model": "SM-A528 family",
+      "versions": [
+        "5.1",
+        "6.1",
+        "7.0"
+      ],
+      "image_url": "https://zinefather.github.io/ZineROM-Project-Site/device-images/a52s-5g.png",
+      "description": "Multiple ZineROM builds are listed on the official project website. Select the build matching your device and installation method.",
+      "download_url": "https://zinefather.github.io/ZineROM-Project-Site/"
+    },
+    {
+      "id": "a11-4g",
+      "name": "Galaxy A11",
+      "model": "SM-A115F",
+      "versions": [
+        "7.0"
+      ],
+      "image_url": "https://zinefather.github.io/ZineROM-Project-Site/device-images/a11-4g.png",
+      "description": "Check the official ZineROM website for build details and availability.",
+      "download_url": "https://zinefather.github.io/ZineROM-Project-Site/"
+    },
+    {
+      "id": "a24-4g",
+      "name": "Galaxy A24",
+      "model": "SM-A245F",
+      "versions": [
+        "9.0"
+      ],
+      "image_url": "https://zinefather.github.io/ZineROM-Project-Site/device-images/a24-4g.png",
+      "description": "Check the official ZineROM website for build details and compatibility notes.",
+      "download_url": "https://zinefather.github.io/ZineROM-Project-Site/"
+    },
+    {
+      "id": "tab-a9-plus-5g-x216b",
+      "name": "Galaxy Tab A9+ 5G",
+      "model": "SM-X216B",
+      "versions": [],
+      "image_url": "https://zinefather.github.io/ZineROM-Project-Site/device-images/tab-a9-plus-5g-x216b.png",
+      "description": "Check the official ZineROM website for current support.",
+      "download_url": "https://zinefather.github.io/ZineROM-Project-Site/"
+    }
+  ]
 }
