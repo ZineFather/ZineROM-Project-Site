@@ -95,8 +95,12 @@ data class AppUpdate(
 data class UpdateCheckResult(val update: AppUpdate?, val hasTargetRules: Boolean)
 data class StartupNotice(val title: String, val message: String, val url: String, val action: String)
 data class Rom(val title: String, val version: String, val downloadUrl: String)
-data class DeviceModule(val title: String, val description: String?, val version: String?, val assetPath: String)
-data class ModuleCatalogItem(val id: String, val title: String, val description: String?, val version: String?, val assetPath: String?, val deviceName: String, val device: Device?)
+data class DeviceModule(val title: String, val description: String?, val version: String?, val assetPath: String?, val downloadUrl: String? = null) {
+    val isDownloadable: Boolean get() = !assetPath.isNullOrBlank() || !downloadUrl.isNullOrBlank()
+}
+data class ModuleCatalogItem(val id: String, val title: String, val description: String?, val version: String?, val assetPath: String?, val downloadUrl: String?, val deviceName: String, val device: Device?) {
+    val isDownloadable: Boolean get() = !assetPath.isNullOrBlank() || !downloadUrl.isNullOrBlank()
+}
 data class Device(
     val id: String, val name: String, val model: String?, val versions: List<String>,
     val imageAssetPath: String?, val description: String?, val downloadUrl: String?, val roms: List<Rom>,
@@ -285,7 +289,24 @@ private fun fetchAppUpdate(updateJsonUrl: String): UpdateCheckResult {
 
 
 private fun saveModuleToDownloads(context: Context, module: DeviceModule) {
-    val fileName = module.assetPath.substringAfterLast('/').ifBlank { "ZineROM-module.zip" }
+    val assetPath = module.assetPath
+    val remoteUrl = module.downloadUrl?.takeIf { it.startsWith("https://") }
+    if (assetPath.isNullOrBlank() && remoteUrl != null) {
+        val parsedName = Uri.parse(remoteUrl).lastPathSegment?.substringBefore('?')
+        val fileName = parsedName?.takeIf { it.endsWith(".zip", ignoreCase = true) }
+            ?: module.title.replace(Regex("[^A-Za-z0-9._-]+"), "_").trim('_') + ".zip"
+        val request = android.app.DownloadManager.Request(Uri.parse(remoteUrl))
+            .setTitle(module.title)
+            .setDescription("Downloading ZineROM module")
+            .setMimeType("application/zip")
+            .setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "ZineROM/$fileName")
+        val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+        if (manager.enqueue(request) == 0L) throw java.io.IOException("Download could not be queued")
+        return
+    }
+    if (assetPath.isNullOrBlank()) throw java.io.IOException("No verified module download source is configured")
+    val fileName = assetPath.substringAfterLast('/').ifBlank { "ZineROM-module.zip" }
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         val values = ContentValues().apply {
             put(MediaStore.Downloads.DISPLAY_NAME, fileName)
@@ -298,7 +319,7 @@ private fun saveModuleToDownloads(context: Context, module: DeviceModule) {
             ?: throw java.io.IOException("Could not create Downloads file")
         try {
             resolver.openOutputStream(uri)?.use { output ->
-                context.assets.open(module.assetPath).use { input -> input.copyTo(output) }
+                context.assets.open(assetPath).use { input -> input.copyTo(output) }
             } ?: throw java.io.IOException("Could not open Downloads output")
             val ready = ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }
             resolver.update(uri, ready, null, null)
@@ -312,7 +333,7 @@ private fun saveModuleToDownloads(context: Context, module: DeviceModule) {
         val folder = File(downloads, "ZineROM")
         if (!folder.exists() && !folder.mkdirs()) throw java.io.IOException("Could not create Downloads/ZineROM")
         val destination = File(folder, fileName)
-        context.assets.open(module.assetPath).use { input ->
+        context.assets.open(assetPath).use { input ->
             destination.outputStream().use { output -> input.copyTo(output) }
         }
     }
@@ -354,13 +375,14 @@ private fun readDevices(context: Context): List<Device> {
         val moduleArray = item.optJSONArray("modules")
         val modules = if (moduleArray == null) emptyList() else (0 until moduleArray.length()).mapNotNull { n ->
             val entry = moduleArray.optJSONObject(n) ?: return@mapNotNull null
-            val assetPath = entry.optString("asset_path")
-            if (!assetPath.startsWith("modules/") || assetPath.contains("..")) return@mapNotNull null
+            val assetPath = entry.optString("asset_path").takeIf { it.startsWith("modules/") && !it.contains("..") }
+            val downloadUrl = entry.optString("download_url").takeIf { it.startsWith("https://") }
             DeviceModule(
                 title = entry.optString("title", "Device module"),
                 description = entry.optString("description").takeIf { it.isNotBlank() },
                 version = entry.optString("version").takeIf { it.isNotBlank() },
-                assetPath = assetPath
+                assetPath = assetPath,
+                downloadUrl = downloadUrl
             )
         }
         Device(
@@ -382,18 +404,19 @@ private fun readModuleCatalog(context: Context, devices: List<Device>): List<Mod
     val result = mutableListOf<ModuleCatalogItem>()
     devices.forEach { device ->
         device.modules.forEachIndexed { index, module ->
-            result += ModuleCatalogItem(device.id + "-" + index, module.title, module.description, module.version, module.assetPath, device.name, device)
+            result += ModuleCatalogItem(device.id + "-" + index, module.title, module.description, module.version, module.assetPath, module.downloadUrl, device.name, device)
         }
     }
     val entries = root.optJSONArray("modules")
     if (entries != null) for (index in 0 until entries.length()) {
         val item = entries.optJSONObject(index) ?: continue
         val asset = item.optString("asset_path").takeIf { it.startsWith("modules/") && !it.contains("..") }
+        val downloadUrl = item.optString("download_url").takeIf { it.startsWith("https://") }
         val device = devices.firstOrNull { it.id == item.optString("device_id") }
         result += ModuleCatalogItem(
             item.optString("id", "standalone-" + index), item.optString("title", "ZineROM module"),
             item.optString("description").takeIf { it.isNotBlank() }, item.optString("version").takeIf { it.isNotBlank() },
-            asset, item.optString("device_name").ifBlank { device?.name ?: "General profile" }, device
+            asset, downloadUrl, item.optString("device_name").ifBlank { device?.name ?: "General profile" }, device
         )
     }
     return result
@@ -554,7 +577,7 @@ fun ZineApp() {
                                     )
                                 }
                                 Column(
-                                    modifier = Modifier.offset(y = 3.dp),
+                                    modifier = Modifier.offset(y = 5.dp),
                                     verticalArrangement = Arrangement.Center
                                 ) {
                                     Text("ZineROM Project", fontWeight = FontWeight.Bold, fontSize = 16.sp, letterSpacing = .1.sp)
@@ -893,7 +916,7 @@ private fun HomeScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("ZINEROM INFO", color = Color(0xFF8CE6F0), fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                        Text(if (arabic) "مركز ZineROM" else "ZineROM Central", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        Text(if (arabic) "مركز تحديثات ZineROM" else "ZineROM Update center", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                     }
                     Box(Modifier.size(56.dp).clip(RoundedCornerShape(18.dp)).background(Blue.copy(alpha = .14f)).border(1.dp, Blue.copy(alpha = .3f), RoundedCornerShape(18.dp)), contentAlignment = Alignment.Center) {
                         Image(painter = painterResource(R.drawable.zine_app_icon), contentDescription = "ZineROM logo", modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(18.dp)), contentScale = ContentScale.Crop)
@@ -1211,8 +1234,8 @@ private fun ModulesScreen(
                 }
                 module.version?.let { Text(it, color = Blue, fontSize = 10.sp) }
                 module.description?.let { Text(it, color = Color(0xFF9AAABD), fontSize = 12.sp, lineHeight = 18.sp) }
-                if (module.assetPath != null) {
-                    Button(onClick = { onSaveModule(DeviceModule(module.title, module.description, module.version, module.assetPath)) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = Blue, contentColor = Color(0xFF07111D))) {
+                if (module.isDownloadable) {
+                    Button(onClick = { onSaveModule(DeviceModule(module.title, module.description, module.version, module.assetPath, module.downloadUrl)) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = Blue, contentColor = Color(0xFF07111D))) {
                         Icon(Icons.Default.Download, contentDescription = null); Spacer(Modifier.width(6.dp)); Text(if (arabic) "حفظ" else "Save")
                     }
                 } else {
