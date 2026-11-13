@@ -1,0 +1,107 @@
+name: ZineROM Send Notification
+
+on:
+  workflow_dispatch:
+    inputs:
+      title:
+        description: "Notification title"
+        required: true
+        type: string
+        default: "ZineROM — New Update"
+      message:
+        description: "Notification message"
+        required: true
+        type: string
+        default: "A new ZineROM update is available. Open the official website for details."
+      type:
+        description: "Notification category"
+        required: true
+        type: choice
+        options: [UPDATE, ANNOUNCEMENT, MAINTENANCE]
+      version:
+        description: "Version label (optional)"
+        required: false
+        type: string
+      target:
+        description: "Who should receive this notification?"
+        required: true
+        type: choice
+        options: [ALL, A52S, A53, A34, A25, A15, A16, A11, A24, TAB_A9_PLUS]
+      button_text:
+        description: "Notification action label"
+        required: true
+        type: string
+        default: "Open ZineROM website"
+      button_url:
+        description: "Destination URL (must be HTTPS)"
+        required: true
+        type: string
+        default: "https://zinefather.github.io/ZineROM-Project-Site/"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate Firebase credentials
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error::Add FIREBASE_SERVICE_ACCOUNT in Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          echo "$FIREBASE_SERVICE_ACCOUNT" | jq -e '.project_id and .client_email and .private_key' >/dev/null
+          echo "PROJECT_ID=$(echo "$FIREBASE_SERVICE_ACCOUNT" | jq -r '.project_id')" >> "$GITHUB_ENV"
+
+      - name: Authenticate to Firebase
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          token_format: access_token
+
+      - name: Send FCM topic notification
+        env:
+          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          TITLE: ${{ inputs.title }}
+          MESSAGE: ${{ inputs.message }}
+          NOTICE_TYPE: ${{ inputs.type }}
+          TARGET_VERSION: ${{ inputs.version }}
+          TARGET: ${{ inputs.target }}
+          BUTTON_TEXT: ${{ inputs.button_text }}
+          BUTTON_URL: ${{ inputs.button_url }}
+        run: |
+          set -euo pipefail
+          case "$TARGET" in
+            ALL) TOPIC="zinerom_all" ;;
+            A52S) TOPIC="zinerom_a52s-5g" ;;
+            A53) TOPIC="zinerom_a53-5g" ;;
+            A34) TOPIC="zinerom_a34-5g" ;;
+            A25) TOPIC="zinerom_a25-5g" ;;
+            A15) TOPIC="zinerom_a15-4g" ;;
+            A16) TOPIC="zinerom_a16-4g" ;;
+            A11) TOPIC="zinerom_a11-4g" ;;
+            A24) TOPIC="zinerom_a24-4g" ;;
+            TAB_A9_PLUS) TOPIC="zinerom_tab-a9-plus-5g-x216b" ;;
+            *) echo "::error::Unsupported target: $TARGET"; exit 1 ;;
+          esac
+          case "$BUTTON_URL" in
+            https://*) ;;
+            *) echo "::error::button_url must start with https://"; exit 1 ;;
+          esac
+          PAYLOAD=$(jq -n \
+            --arg topic "$TOPIC" --arg title "$TITLE" --arg message "$MESSAGE" \
+            --arg type "$NOTICE_TYPE" --arg version "$TARGET_VERSION" \
+            --arg button_text "$BUTTON_TEXT" --arg button_url "$BUTTON_URL" \
+            '{message:{topic:$topic,data:{title:$title,message:$message,type:$type,target_version:$version,button_text:$button_text,button_url:$button_url},android:{priority:"HIGH"}}}')
+          curl --fail-with-body --silent --show-error \
+            -X POST "https://fcm.googleapis.com/v1/projects/$PROJECT_ID/messages:send" \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Content-Type: application/json; charset=UTF-8" \
+            -d "$PAYLOAD"
+          echo "FCM accepted notification for topic: $TOPIC"
