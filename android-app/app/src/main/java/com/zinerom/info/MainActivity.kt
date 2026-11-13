@@ -433,6 +433,7 @@ fun ZineApp() {
     val navController = rememberNavController()
     var config by remember { mutableStateOf<AppConfig?>(null) }
     var devices by remember { mutableStateOf(emptyList<Device>()) }
+    var moduleCatalog by remember { mutableStateOf(emptyList<ModuleCatalogItem>()) }
     var selectedDevice by remember { mutableStateOf<Device?>(null) }
     var arabic by remember { mutableStateOf(false) }
     var checking by remember { mutableStateOf(false) }
@@ -460,7 +461,10 @@ fun ZineApp() {
         if (loadedConfig != null) config = loadedConfig
 
         withContext(Dispatchers.IO) {
-            runCatching { readDevices(context) }.getOrNull()?.let { devices = it }
+            runCatching { readDevices(context) }.getOrNull()?.let { loaded ->
+                devices = loaded
+                moduleCatalog = runCatching { readModuleCatalog(context, loaded) }.getOrDefault(emptyList())
+            }
         }
 
         val romBuild = withContext(Dispatchers.IO) {
@@ -597,7 +601,7 @@ fun ZineApp() {
                     }
                     composable("modules") {
                         ModulesScreen(
-                            devices = devices,
+                            modules = moduleCatalog,
                             arabic = arabic,
                             modifier = Modifier.fillMaxSize(),
                             onSaveModule = saveModule,
