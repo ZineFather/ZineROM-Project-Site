@@ -65,24 +65,32 @@ jobs:
         with:
           gradle-version: "8.13"
 
-      - name: Compile Android app sources
-        run: gradle --no-daemon :app:compileDebugKotlin
+      - name: Checkout ZineROM platform signing certificate
+        uses: actions/checkout@v4
+        with:
+          repository: ZineFather/ZineROM8.5-A52s
+          ref: seventeen-s26u
+          path: rom-source
+
+      - name: Build unsigned release APK
+        run: gradle --no-daemon clean assembleRelease
         working-directory: android-app
 
-      - name: Build debug APK
-        env:
-          ZINEROM_SIGNING_KEYSTORE_BASE64: ${{ secrets.ZINEROM_SIGNING_KEYSTORE_BASE64 }}
-          ZINEROM_SIGNING_STORE_PASSWORD: ${{ secrets.ZINEROM_SIGNING_STORE_PASSWORD }}
-          ZINEROM_SIGNING_KEY_ALIAS: ${{ secrets.ZINEROM_SIGNING_KEY_ALIAS }}
-          ZINEROM_SIGNING_KEY_PASSWORD: ${{ secrets.ZINEROM_SIGNING_KEY_PASSWORD }}
+      - name: Sign APK with the ZineROM platform certificate
+        shell: bash
         run: |
-          if [ -z "$ZINEROM_SIGNING_KEYSTORE_BASE64" ] || [ -z "$ZINEROM_SIGNING_STORE_PASSWORD" ] || [ -z "$ZINEROM_SIGNING_KEY_ALIAS" ] || [ -z "$ZINEROM_SIGNING_KEY_PASSWORD" ]; then
-            echo "::error::Stable signing secrets are required. Refusing to create an APK with a temporary debug certificate that cannot safely update the installed app."
-            exit 1
-          fi
-          gradle --no-daemon clean assembleDebug
-        working-directory: android-app
-
+          set -euo pipefail
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/36.0.0"
+          UNSIGNED="android-app/app/build/outputs/apk/release/app-release-unsigned.apk"
+          ALIGNED="android-app/app/build/outputs/apk/release/ZineROM-Info-aligned.apk"
+          SIGNED="android-app/app/build/outputs/apk/release/ZineROM-Info-3.2.7.apk"
+          test -s "$UNSIGNED"
+          test -s "rom-source/security/aosp_platform.pk8"
+          test -s "rom-source/security/aosp_platform.x509.pem"
+          "$BUILD_TOOLS/zipalign" -f -p 4 "$UNSIGNED" "$ALIGNED"
+          "$BUILD_TOOLS/apksigner" sign --key rom-source/security/aosp_platform.pk8 --cert rom-source/security/aosp_platform.x509.pem --out "$SIGNED" "$ALIGNED"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$SIGNED"
+          sha256sum "$SIGNED"
       - name: Verify APK
         run: |
           set -euo pipefail
@@ -94,7 +102,7 @@ jobs:
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: ZineROM-Info-debug
-          path: android-app/app/build/outputs/apk/debug/app-debug.apk
+          name: ZineROM-Info-3.2.7-ROM-signed
+          path: android-app/app/build/outputs/apk/release/ZineROM-Info-3.2.7.apk
           if-no-files-found: error
           retention-days: 14
