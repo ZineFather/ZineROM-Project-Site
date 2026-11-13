@@ -33,15 +33,15 @@ jobs:
       - name: Install Android SDK packages
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Configure and validate Firebase client
+      - name: Configure Firebase client (optional)
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         shell: bash
         run: |
           set -euo pipefail
           if [ -z "$GOOGLE_SERVICES_JSON" ]; then
-            echo "::error::GOOGLE_SERVICES_JSON secret is required; refusing to build an APK without Firebase."
-            exit 1
+            echo "::notice::GOOGLE_SERVICES_JSON is not configured. Building the APK without Firebase push notifications."
+            exit 0
           fi
           printf '%s' "$GOOGLE_SERVICES_JSON" > android-app/app/google-services.json
           PROJECT_ID=$(jq -r '.project_info.project_id // empty' android-app/app/google-services.json)
