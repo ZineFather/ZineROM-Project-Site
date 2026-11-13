@@ -86,7 +86,7 @@ jobs:
           BUILD_TOOLS="$ANDROID_HOME/build-tools/36.0.0"
           UNSIGNED="android-app/app/build/outputs/apk/release/app-release-unsigned.apk"
           ALIGNED="android-app/app/build/outputs/apk/release/ZineROM-Info-aligned.apk"
-          SIGNED="android-app/app/build/outputs/apk/release/ZineROM-Info-3.2.9.apk"
+          SIGNED="android-app/app/build/outputs/apk/release/ZineROM-Info-3.3.0.apk"
           KEY="rom-signing/aosp_platform.pk8"
           CERT="rom-signing/aosp_platform.x509.pem"
           test -s "$UNSIGNED"
@@ -102,7 +102,7 @@ jobs:
       - name: Upload ROM-signed release APK
         uses: actions/upload-artifact@v4
         with:
-          name: ZineROM-Info-3.2.9-ROM-signed
-          path: android-app/app/build/outputs/apk/release/ZineROM-Info-3.2.9.apk
+          name: ZineROM-Info-3.3.0-ROM-signed
+          path: android-app/app/build/outputs/apk/release/ZineROM-Info-3.3.0.apk
           if-no-files-found: error
           retention-days: 14
