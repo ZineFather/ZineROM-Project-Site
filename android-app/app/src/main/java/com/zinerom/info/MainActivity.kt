@@ -549,7 +549,7 @@ fun ZineApp() {
                                     )
                                 }
                                 Column(
-                                    modifier = Modifier.offset(y = 2.dp),
+                                    modifier = Modifier.offset(y = 3.dp),
                                     verticalArrangement = Arrangement.Center
                                 ) {
                                     Text("ZineROM Project", fontWeight = FontWeight.Bold, fontSize = 16.sp, letterSpacing = .1.sp)
@@ -880,7 +880,7 @@ private fun HomeScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("ZINEROM INFO", color = Color(0xFF8CE6F0), fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                        Text(if (arabic) "تطبيق ZineROM" else "ZineROM App", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        Text(if (arabic) "مركز ZineROM" else "ZineROM Central", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                     }
                     Box(Modifier.size(56.dp).clip(RoundedCornerShape(18.dp)).background(Blue.copy(alpha = .14f)).border(1.dp, Blue.copy(alpha = .3f), RoundedCornerShape(18.dp)), contentAlignment = Alignment.Center) {
                         Image(painter = painterResource(R.drawable.zine_app_icon), contentDescription = "ZineROM logo", modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(18.dp)), contentScale = ContentScale.Crop)
