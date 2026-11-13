@@ -115,7 +115,14 @@
       ],
       "image_url": "https://zinefather.github.io/ZineROM-Project-Site/device-images/a52s-5g.png",
       "description": "Multiple ZineROM builds are listed on the official project website. Select the build matching your device and installation method.",
-      "download_url": "https://zinefather.github.io/ZineROM-Project-Site/"
+      "download_url": "https://zinefather.github.io/ZineROM-Project-Site/",
+      "modules": [
+        {
+          "title": "A52s Camera Fix",
+          "description": "Camera compatibility fix module for Galaxy A52s 5G. Verify compatibility with your exact ROM build before installing.",
+          "download_url": "https://gofile.io/d/DITlI845"
+        }
+      ]
     },
     {
       "id": "a11-4g",
