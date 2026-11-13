@@ -53,55 +53,134 @@
       "filename": "IMG_20261108_200529_990.jpg",
       "title": "One UI 9 Software Information",
       "description": "Software information screen showing One UI 9.0, Android 17, and ZineROM V3.2.4 [SM-A155F].",
-      "generation": "oneUi9"
+      "generation": "oneUi9",
+      "collection": "s23"
     },
     {
       "filename": "IMG_20261108_200529_388.jpg",
       "title": "Galaxy A15 Device Information",
       "description": "About phone page identifying Galaxy A15, model SM-A155F/DS.",
-      "generation": "oneUi9"
+      "generation": "oneUi9",
+      "collection": "s23"
     },
     {
       "filename": "IMG_20261108_200529_625.jpg",
       "title": "Galaxy AI Features",
       "description": "Galaxy AI introduction showing Call assist, Writing assist, and Interpreter features.",
-      "generation": "oneUi9"
+      "generation": "oneUi9",
+      "collection": "s23"
     },
     {
       "filename": "IMG_20261108_200526_094.jpg",
       "title": "Galaxy A15 Home Screen",
       "description": "One UI Home screen with a weather widget, Google search bar, and app dock on a dark wallpaper.",
-      "generation": "oneUi9"
+      "generation": "oneUi9",
+      "collection": "s23"
     },
     {
       "filename": "IMG_20261108_200525_697.jpg",
       "title": "App Drawer",
       "description": "Galaxy app drawer with Samsung and Google folders, Play Store, Galaxy Store, and common apps.",
-      "generation": "oneUi9"
+      "generation": "oneUi9",
+      "collection": "s23"
     },
     {
       "filename": "IMG_20261108_200526_560.jpg",
       "title": "Expanded Quick Settings",
       "description": "Expanded quick panel showing Wi-Fi, Bluetooth, brightness and volume sliders, media, Smart View, Modes, and device controls.",
-      "generation": "oneUi9"
+      "generation": "oneUi9",
+      "collection": "s23"
     },
     {
       "filename": "IMG_20261108_200525_828.jpg",
       "title": "Settings and Galaxy AI",
       "description": "Settings screen with Galaxy AI, Connections, Connected devices, Modes and routines, and sound settings.",
-      "generation": "oneUi9"
+      "generation": "oneUi9",
+      "collection": "s23"
     },
     {
       "filename": "IMG_20261108_200526_203.jpg",
       "title": "Galaxy A15 Lock Screen",
       "description": "Dark lock screen showing 14:41 on Sunday, November 8, with phone and camera shortcuts.",
-      "generation": "oneUi9"
+      "generation": "oneUi9",
+      "collection": "s23"
     },
     {
       "filename": "IMG_20261108_200525_722.jpg",
       "title": "Notification Panel",
       "description": "Notification shade showing screenshot, device setup, and memory card notifications.",
-      "generation": "oneUi9"
+      "generation": "oneUi9",
+      "collection": "s23"
+    },
+    {
+      "filename": "IMG_20261112_094610_940.jpg",
+      "title": "Device Care and Resource Usage",
+      "description": "Device Care showing battery, storage, memory, and processing-speed status on the A15 Stock ROM.",
+      "generation": "oneUi9",
+      "collection": "stock"
+    },
+    {
+      "filename": "IMG_20261112_094611_225.jpg",
+      "title": "One UI 9 Software Information",
+      "description": "Software information showing the One UI 9 version and Android version on the A15 Stock ROM.",
+      "generation": "oneUi9",
+      "collection": "stock"
+    },
+    {
+      "filename": "IMG_20261112_094611_507.jpg",
+      "title": "Expanded Quick Panel",
+      "description": "Expanded quick panel with connectivity toggles, brightness and volume controls, and device controls.",
+      "generation": "oneUi9",
+      "collection": "stock"
+    },
+    {
+      "filename": "IMG_20261112_094611_510.jpg",
+      "title": "Recently Used Settings",
+      "description": "Recently used settings view with the One UI 9 quick settings layout.",
+      "generation": "oneUi9",
+      "collection": "stock"
+    },
+    {
+      "filename": "IMG_20261112_094611_587.jpg",
+      "title": "Galaxy AI Settings",
+      "description": "Galaxy AI settings showing Call assist, Writing assist, Note assist, Transcript assist, Browsing assist, and Health assist.",
+      "generation": "oneUi9",
+      "collection": "stock"
+    },
+    {
+      "filename": "IMG_20261112_094611_592.jpg",
+      "title": "Warranty and Care",
+      "description": "Warranty and care page with device-care and support options.",
+      "generation": "oneUi9",
+      "collection": "stock"
+    },
+    {
+      "filename": "IMG_20261112_094611_622.jpg",
+      "title": "Settings Home",
+      "description": "Main Settings page with Galaxy AI, Connections, connected devices, and Modes and routines.",
+      "generation": "oneUi9",
+      "collection": "stock"
+    },
+    {
+      "filename": "IMG_20261112_094611_788.jpg",
+      "title": "Setup Complete",
+      "description": "One UI setup-complete screen with the A15 Stock ROM gradient background.",
+      "generation": "oneUi9",
+      "collection": "stock"
+    },
+    {
+      "filename": "IMG_20261112_094611_860.jpg",
+      "title": "A15 Stock ROM Home Screen",
+      "description": "A15 Stock ROM home screen with weather widget, app dock, and One UI 9 wallpaper.",
+      "generation": "oneUi9",
+      "collection": "stock"
+    },
+    {
+      "filename": "IMG_20261112_095157_912.jpg",
+      "title": "About Phone and Software Details",
+      "description": "About phone screen showing A15 device information and software details.",
+      "generation": "oneUi9",
+      "collection": "stock"
     }
   ]
 }
