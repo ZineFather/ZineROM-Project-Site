@@ -35,6 +35,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -423,7 +425,7 @@ fun ZineApp() {
                                         .background(Brush.linearGradient(listOf(Blue.copy(alpha = .28f), Color(0xFF8CE6F0).copy(alpha = .10f))))
                                         .border(1.dp, Blue.copy(alpha = .35f), RoundedCornerShape(12.dp)),
                                     contentAlignment = Alignment.Center
-                                ) { Text("Z", color = Blue, fontWeight = FontWeight.Black, fontSize = 23.sp) }
+                                ) { Image(painter = painterResource(R.drawable.zine_app_icon), contentDescription = "ZineROM logo", modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop) }
                                 Column {
                                     Text("ZineROM", fontWeight = FontWeight.Bold, fontSize = 17.sp)
                                     Text("PROJECT COMPANION", color = Color(0xFF9AAABD), fontSize = 8.sp, letterSpacing = 1.5.sp)
@@ -740,7 +742,7 @@ private fun HomeScreen(
                         Text(if (arabic) "مركز المشروع" else "Project hub", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                     }
                     Box(Modifier.size(56.dp).clip(RoundedCornerShape(18.dp)).background(Blue.copy(alpha = .14f)).border(1.dp, Blue.copy(alpha = .3f), RoundedCornerShape(18.dp)), contentAlignment = Alignment.Center) {
-                        Text("Z", color = Blue, fontSize = 38.sp, fontWeight = FontWeight.Black)
+                        Image(painter = painterResource(R.drawable.zine_app_icon), contentDescription = "ZineROM logo", modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(18.dp)), contentScale = ContentScale.Crop)
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -896,7 +898,7 @@ private fun AboutScreen(modifier: Modifier, arabic: Boolean, onWebsite: () -> Un
         Text(if (arabic) "عن ZineROM" else "About ZineROM", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
         GlassPanel {
             Box(Modifier.size(64.dp).clip(RoundedCornerShape(20.dp)).background(Blue.copy(alpha = .16f)).border(1.dp, Blue.copy(alpha = .3f), RoundedCornerShape(20.dp)), contentAlignment = Alignment.Center) {
-                Text("Z", color = Blue, fontSize = 44.sp, fontWeight = FontWeight.Black)
+                Image(painter = painterResource(R.drawable.zine_app_icon), contentDescription = "ZineROM logo", modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(20.dp)), contentScale = ContentScale.Crop)
             }
             Text("ZineROM info", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Text(if (arabic) "التطبيق المرافق لمشروع ZineROM." else "The companion app for the ZineROM project.", color = Color(0xFF9AAABD), fontSize = 13.sp)
