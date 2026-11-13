@@ -128,6 +128,7 @@ jobs:
             '{
               message: {
                 topic: $topic,
+                notification: { title: $title, body: $message },
                 data: {
                   title: $title,
                   message: $message,
@@ -137,15 +138,24 @@ jobs:
                   button_text: $button_text,
                   button_url: $button_url
                 },
-                android: { priority: "HIGH" }
+                android: {
+                  priority: "HIGH",
+                  notification: {
+                    channel_id: "zinerom_updates",
+                    sound: "default"
+                  }
+                }
               }
             }')
 
-          curl --fail-with-body --silent --show-error \
+          RESPONSE=$(curl --fail-with-body --silent --show-error \
             -X POST "https://fcm.googleapis.com/v1/projects/$PROJECT_ID/messages:send" \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
             -H "Content-Type: application/json; charset=UTF-8" \
-            -d "$PAYLOAD"
+            -d "$PAYLOAD")
 
-          echo
-          echo "Notification sent to all app installs via topic: $TOPIC (target: $TARGET_LABEL)"
+          echo "$RESPONSE" | jq .
+          MESSAGE_NAME=$(echo "$RESPONSE" | jq -er '.name')
+          echo "Firebase accepted message: $MESSAGE_NAME"
+          echo "Topic: $TOPIC | Intended device: $TARGET_LABEL"
+          echo "Android background delivery uses the system notification payload; foreground delivery uses the app messaging service."
