@@ -154,12 +154,6 @@
       "description": "Check the official ZineROM website for current support.",
       "download_url": "https://zinefather.github.io/ZineROM-Project-Site/",
       "image_asset": "device-images/tab-a9-plus-5g-x216b.png"
-    },
-    {
-      "id": "s26-ultra",
-      "name": "Galaxy S26 Ultra",
-      "versions": [],
-      "description": "Device profile listed in the ZineROM companion. No verified ZineROM build or compatible module is published here yet."
     }
   ]
 }
