@@ -541,7 +541,7 @@ fun ZineApp() {
                                                 startupNotice = StartupNotice(
                                                     title = if (arabic) "تحديث ZineROM متاح" else "ZineROM update available",
                                                     message = if (arabic)
-                                                        "إصدار الروم ${romBuild.version} أقدم من 3.2.5. افتح الموقع للبحث عن أحدث إصدار وتحميله."
+                                                        "الإصدار المثبت ${romBuild.version}، وأحدث إصدار ${remoteVersion}. افتح الموقع للحصول على التحديث."
                                                     else
                                                         "Installed ROM: ${romBuild.version}. Latest ROM: ${remoteVersion}. Open the website to get the update.",
                                                     url = source.websiteUrl.ifBlank { DEFAULT_WEBSITE },
@@ -849,7 +849,7 @@ private fun UpdatesScreen(
     LazyColumn(modifier, contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
             Text(if (arabic) "مركز التحديثات" else "Update center", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
-            Text(if (arabic) "تحديثات التطبيق وإصدارات الرومات." else "App updates and ROM releases.", color = Color(0xFF9AAABD), fontSize = 12.sp)
+            Text(if (arabic) "إصدارات الروم والتحقق من Build Number." else "ROM releases and installed build verification.", color = Color(0xFF9AAABD), fontSize = 12.sp)
         }
         item {
             GlassPanel {
@@ -863,7 +863,6 @@ private fun UpdatesScreen(
                     Text(if (checking) (if (arabic) "جارٍ الفحص..." else "Checking...") else (if (arabic) "فحص التحديثات" else "Check for updates"), fontWeight = FontWeight.Bold)
                 }
                 Text(status, color = if (status.contains("failed", true) || status.contains("فشل")) Color(0xFFFFA6A6) else Color(0xFF8CE6F0), fontSize = 12.sp)
-                if (latestVersion.isNotBlank()) Text(if (arabic) "الإصدار المستهدف: " + latestVersion else "Server version: " + latestVersion, color = Color(0xFF9AAABD), fontSize = 11.sp)
 
             }
         }
