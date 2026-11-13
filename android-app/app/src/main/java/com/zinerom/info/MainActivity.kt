@@ -162,10 +162,14 @@ private fun readRomBuildInfo(): RomBuildInfo? {
         .filter { it.isNotEmpty() }
 
     val combinedBuild = candidates.joinToString(" | ")
-    if (!combinedBuild.contains("ZineROM", ignoreCase = true)) return null
+    val markerIndex = combinedBuild.indexOf("ZineROM", ignoreCase = true)
+    if (markerIndex < 0) return null
 
-    val version = Regex("""(?<!\d)(\d+\.\d+\.\d+(?:\.\d+)?)(?!\d)""")
-        .find(combinedBuild)?.groupValues?.getOrNull(1)
+    val versionPattern = Regex("""(?<!\d)(\d+\.\d+\.\d+(?:\.\d+)?)(?!\d)""")
+    val afterMarker = combinedBuild.substring(markerIndex)
+    val beforeMarker = combinedBuild.substring(0, markerIndex)
+    val version = (versionPattern.find(afterMarker) ?: versionPattern.find(beforeMarker))
+        ?.groupValues?.getOrNull(1)
         ?: return null
     return RomBuildInfo(combinedBuild, version)
 }
