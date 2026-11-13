@@ -65,6 +65,10 @@ jobs:
         with:
           gradle-version: "8.13"
 
+      - name: Compile Android app sources
+        run: gradle --no-daemon :app:compileDebugKotlin
+        working-directory: android-app
+
       - name: Build debug APK
         env:
           ZINEROM_SIGNING_KEYSTORE_BASE64: ${{ secrets.ZINEROM_SIGNING_KEYSTORE_BASE64 }}
