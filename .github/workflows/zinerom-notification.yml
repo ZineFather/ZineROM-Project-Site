@@ -3,11 +3,6 @@ name: ZineROM Send Notification
 on:
   workflow_dispatch:
     inputs:
-      title:
-        description: "Notification title"
-        required: true
-        type: string
-        default: "ZineROM — New Update"
       message:
         description: "Notification message"
         required: true
@@ -17,16 +12,35 @@ on:
         description: "Notification category"
         required: true
         type: choice
-        options: [UPDATE, ANNOUNCEMENT, MAINTENANCE]
+        default: "ROM Update"
+        options:
+          - "ROM Update"
+          - "Warning"
+          - "Test"
+          - "Developer Analysis"
+          - "Announcement"
+          - "Important"
+          - "Bug Report"
+          - "Maintenance"
       version:
         description: "Version label (optional)"
         required: false
         type: string
       target:
-        description: "Who should receive this notification?"
+        description: "Device this notification is about (all installs still receive it)"
         required: true
         type: choice
-        options: [ALL, A52S, A53, A34, A25, A15, A16, A11, A24, TAB_A9_PLUS]
+        options:
+          - ALL
+          - A52S
+          - A53
+          - A34
+          - A25
+          - A15
+          - A16
+          - A11
+          - A24
+          - TAB_A9_PLUS
       button_text:
         description: "Notification action label"
         required: true
@@ -40,7 +54,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   send:
@@ -48,27 +61,27 @@ jobs:
     steps:
       - name: Validate Firebase credentials
         env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ (secrets.FIREBASE_SERVICE_ACCOUNT || secrets.FCM_SERVICE_ACCOUNT_JSON) }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT || secrets.FCM_SERVICE_ACCOUNT_JSON }}
         run: |
           set -euo pipefail
           if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
-            echo "::error::Add FIREBASE_SERVICE_ACCOUNT in Settings > Secrets and variables > Actions."
+            echo "::error::Add FIREBASE_SERVICE_ACCOUNT or FCM_SERVICE_ACCOUNT_JSON in repository Actions secrets."
             exit 1
           fi
           echo "$FIREBASE_SERVICE_ACCOUNT" | jq -e '.project_id and .client_email and .private_key' >/dev/null
-          echo "PROJECT_ID=$(echo "$FIREBASE_SERVICE_ACCOUNT" | jq -r '.project_id')" >> "$GITHUB_ENV"
+          PROJECT_ID=$(echo "$FIREBASE_SERVICE_ACCOUNT" | jq -r '.project_id')
+          echo "project_id=$PROJECT_ID" >> "$GITHUB_ENV"
 
       - name: Authenticate to Firebase
         id: auth
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ (secrets.FIREBASE_SERVICE_ACCOUNT || secrets.FCM_SERVICE_ACCOUNT_JSON) }}
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT || secrets.FCM_SERVICE_ACCOUNT_JSON }}
           token_format: access_token
 
       - name: Send FCM topic notification
         env:
           ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
-          TITLE: ${{ inputs.title }}
           MESSAGE: ${{ inputs.message }}
           NOTICE_TYPE: ${{ inputs.type }}
           TARGET_VERSION: ${{ inputs.version }}
@@ -77,31 +90,84 @@ jobs:
           BUTTON_URL: ${{ inputs.button_url }}
         run: |
           set -euo pipefail
+
+          TOPIC="zinerom_all"
           case "$TARGET" in
-            ALL) TOPIC="zinerom_all" ;;
-            A52S) TOPIC="zinerom_a52s-5g" ;;
-            A53) TOPIC="zinerom_a53-5g" ;;
-            A34) TOPIC="zinerom_a34-5g" ;;
-            A25) TOPIC="zinerom_a25-5g" ;;
-            A15) TOPIC="zinerom_a15-4g" ;;
-            A16) TOPIC="zinerom_a16-4g" ;;
-            A11) TOPIC="zinerom_a11-4g" ;;
-            A24) TOPIC="zinerom_a24-4g" ;;
-            TAB_A9_PLUS) TOPIC="zinerom_tab-a9-plus-5g-x216b" ;;
+            ALL) TARGET_LABEL="All devices" ;;
+            A52S) TARGET_LABEL="Galaxy A52s 5G (A52S)" ;;
+            A53) TARGET_LABEL="Galaxy A53 5G (A53)" ;;
+            A34) TARGET_LABEL="Galaxy A34 5G (A34)" ;;
+            A25) TARGET_LABEL="Galaxy A25 5G (A25)" ;;
+            A15) TARGET_LABEL="Galaxy A15 4G (A15)" ;;
+            A16) TARGET_LABEL="Galaxy A16 4G (A16)" ;;
+            A11) TARGET_LABEL="Galaxy A11 (A11)" ;;
+            A24) TARGET_LABEL="Galaxy A24 (A24)" ;;
+            TAB_A9_PLUS) TARGET_LABEL="Galaxy Tab A9+ 5G (TAB_A9_PLUS)" ;;
             *) echo "::error::Unsupported target: $TARGET"; exit 1 ;;
           esac
+
           case "$BUTTON_URL" in
             https://*) ;;
             *) echo "::error::button_url must start with https://"; exit 1 ;;
           esac
+
+          case "$NOTICE_TYPE" in
+            "ROM Update") TITLE="ZineROM • New Update" ;;
+            "Warning") TITLE="ZineROM • Warning" ;;
+            "Test") TITLE="ZineROM • Test Notification" ;;
+            "Developer Analysis") TITLE="ZineROM • Developer Analysis" ;;
+            "Announcement") TITLE="ZineROM • Announcement" ;;
+            "Important") TITLE="ZineROM • Important Notice" ;;
+            "Bug Report") TITLE="ZineROM • Bug Report" ;;
+            "Maintenance") TITLE="ZineROM • Maintenance" ;;
+            *) echo "::error::Unsupported notification type: $NOTICE_TYPE"; exit 1 ;;
+          esac
+
+          DISPLAY_MESSAGE="$MESSAGE"
+          if [ "$TARGET" != "ALL" ]; then
+            DISPLAY_MESSAGE="$MESSAGE"$'\n\n'"Target device: $TARGET_LABEL"
+          fi
+
           PAYLOAD=$(jq -n \
-            --arg topic "$TOPIC" --arg title "$TITLE" --arg message "$MESSAGE" \
-            --arg type "$NOTICE_TYPE" --arg version "$TARGET_VERSION" \
-            --arg button_text "$BUTTON_TEXT" --arg button_url "$BUTTON_URL" \
-            '{message:{topic:$topic,data:{title:$title,message:$message,type:$type,target_version:$version,button_text:$button_text,button_url:$button_url},android:{priority:"HIGH"}}}')
-          curl --fail-with-body --silent --show-error \
+            --arg topic "$TOPIC" \
+            --arg title "$TITLE" \
+            --arg message "$DISPLAY_MESSAGE" \
+            --arg target_device "$TARGET_LABEL" \
+            --arg type "$NOTICE_TYPE" \
+            --arg version "$TARGET_VERSION" \
+            --arg button_text "$BUTTON_TEXT" \
+            --arg button_url "$BUTTON_URL" \
+            '{
+              message: {
+                topic: $topic,
+                notification: { title: $title, body: $message },
+                data: {
+                  title: $title,
+                  message: $message,
+                  type: $type,
+                  target_version: $version,
+                  target_device: $target_device,
+                  button_text: $button_text,
+                  button_url: $button_url
+                },
+                android: {
+                  priority: "HIGH",
+                  notification: {
+                    channel_id: "zinerom_alerts_v2",
+                    sound: "default"
+                  }
+                }
+              }
+            }')
+
+          RESPONSE=$(curl --fail-with-body --silent --show-error \
             -X POST "https://fcm.googleapis.com/v1/projects/$PROJECT_ID/messages:send" \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
             -H "Content-Type: application/json; charset=UTF-8" \
-            -d "$PAYLOAD"
-          echo "FCM accepted notification for topic: $TOPIC"
+            -d "$PAYLOAD")
+
+          echo "$RESPONSE" | jq .
+          MESSAGE_NAME=$(echo "$RESPONSE" | jq -er '.name')
+          echo "Firebase accepted message: $MESSAGE_NAME"
+          echo "Topic: $TOPIC | Intended device: $TARGET_LABEL"
+          echo "Android background delivery uses the system notification payload; foreground delivery uses the app messaging service."
