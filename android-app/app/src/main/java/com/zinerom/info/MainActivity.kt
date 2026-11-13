@@ -55,15 +55,25 @@ import androidx.core.content.ContextCompat
 
 private const val DEFAULT_TELEGRAM = "https://t.me/ZineROMProject/13/4542"
 private const val NOTIFICATION_CHANNEL = "zinerom_updates"
+private const val CURRENT_APP_VERSION = "3.2.4" // Temporary comparison version for the 3.2.5 update test.
+private const val DEFAULT_UPDATE_JSON =
+    "https://raw.githubusercontent.com/ZineFather/ZineROM-Project-Site/zinerom-info-development/remote/update.json"
 private val httpClient = OkHttpClient()
 
 data class AppConfig(
     val websiteUrl: String,
     val releasesUrl: String,
+    val updateJsonUrl: String,
     val telegramUrl: String,
-    val changelogUrl: String,
-    val workflowUrl: String
+    val changelogUrl: String
 )
+data class AppUpdate(
+    val version: String,
+    val downloadUrl: String?,
+    val changelogUrl: String?,
+    val notes: String?
+)
+data class UpdateCheckResult(val update: AppUpdate?, val hasTargetRules: Boolean)
 data class Rom(val title: String, val version: String, val downloadUrl: String)
 data class Device(
     val id: String, val name: String, val model: String?, val versions: List<String>,
@@ -128,14 +138,72 @@ private fun notifyUpdate(context: Context, version: String) {
 }
 
 private fun versionIsNewer(remote: String, current: String): Boolean {
-    val a = remote.split(".").map { it.toIntOrNull() ?: 0 }
-    val b = current.split(".").map { it.toIntOrNull() ?: 0 }
+    val a = remote.trim().removePrefix("v").split(".").map { it.toIntOrNull() ?: 0 }
+    val b = current.trim().removePrefix("v").split(".").map { it.toIntOrNull() ?: 0 }
     for (index in 0 until maxOf(a.size, b.size)) {
         val left = a.getOrElse(index) { 0 }
         val right = b.getOrElse(index) { 0 }
         if (left != right) return left > right
     }
     return false
+}
+
+private fun readStringSet(json: JSONObject, vararg keys: String): Set<String> {
+    val values = mutableSetOf<String>()
+    keys.forEach { key ->
+        when (val value = json.opt(key)) {
+            is org.json.JSONArray -> for (i in 0 until value.length()) {
+                value.optString(i).trim().takeIf { it.isNotEmpty() }?.let { values.add(it.uppercase()) }
+            }
+            is String -> value.split(",", ";").map { it.trim() }
+                .filter { it.isNotEmpty() }.forEach { values.add(it.uppercase()) }
+        }
+    }
+    return values
+}
+
+private fun matchesThisDevice(target: JSONObject): Boolean {
+    val codenames = readStringSet(target, "device_codenames", "codenames", "device_codename")
+    val models = readStringSet(target, "models", "model")
+    val localCodenames = setOf(Build.DEVICE, Build.PRODUCT, Build.BOARD)
+        .map { it.trim().uppercase() }.filter { it.isNotEmpty() }.toSet()
+    val localModels = setOf(Build.MODEL, Build.MANUFACTURER + " " + Build.MODEL)
+        .map { it.trim().uppercase() }.filter { it.isNotEmpty() }.toSet()
+    return (codenames.isNotEmpty() && codenames.any { it in localCodenames }) ||
+        (models.isNotEmpty() && models.any { wanted ->
+            localModels.any { actual -> actual == wanted || actual.startsWith(wanted) }
+        })
+}
+
+private fun parseAppUpdate(json: JSONObject): AppUpdate {
+    val version = json.optString("version", json.optString("latest_app_version", ""))
+    val download = json.optString("download_url").takeIf { it.startsWith("https://") }
+    val changelog = json.optString("changelog_url").takeIf { it.startsWith("https://") }
+    return AppUpdate(version, download, changelog, json.optString("notes").takeIf { it.isNotBlank() })
+}
+
+private fun fetchAppUpdate(updateJsonUrl: String): UpdateCheckResult {
+    val request = Request.Builder().url(updateJsonUrl).header("Cache-Control", "no-cache").build()
+    val root = httpClient.newCall(request).execute().use { response ->
+        if (!response.isSuccessful) throw IllegalStateException("Update server HTTP " + response.code)
+        JSONObject(response.body?.string().orEmpty())
+    }
+    val targets = root.optJSONArray("targets")
+    if (targets != null && targets.length() > 0) {
+        for (index in 0 until targets.length()) {
+            val target = targets.optJSONObject(index) ?: continue
+            if (matchesThisDevice(target)) {
+                val merged = JSONObject(root.toString())
+                listOf("version", "latest_app_version", "download_url", "changelog_url", "notes").forEach { key ->
+                    if (!target.has(key) && root.has(key)) merged.put(key, root.opt(key))
+                }
+                target.keys().forEach { key -> merged.put(key, target.opt(key)) }
+                return UpdateCheckResult(parseAppUpdate(merged), true)
+            }
+        }
+        return UpdateCheckResult(null, true)
+    }
+    return UpdateCheckResult(parseAppUpdate(root), false)
 }
 
 private fun openLink(context: Context, url: String?) {
@@ -149,9 +217,9 @@ private fun readConfig(context: Context): AppConfig {
     return AppConfig(
         websiteUrl = json.optString("website_url"),
         releasesUrl = json.optString("releases_url"),
+        updateJsonUrl = json.optString("update_json_url", DEFAULT_UPDATE_JSON).ifBlank { DEFAULT_UPDATE_JSON },
         telegramUrl = json.optString("telegram_url", DEFAULT_TELEGRAM),
-        changelogUrl = json.optString("changelog_url", DEFAULT_TELEGRAM),
-        workflowUrl = json.optString("workflow_url")
+        changelogUrl = json.optString("changelog_url", DEFAULT_TELEGRAM)
     )
 }
 
@@ -182,12 +250,11 @@ private fun readDevices(context: Context): List<Device> {
 class UpdateWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result = try {
         val config = readConfig(applicationContext)
-        val request = Request.Builder().url(config.releasesUrl).build()
-        val latest = httpClient.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) throw IllegalStateException("HTTP " + response.code)
-            JSONObject(response.body?.string().orEmpty()).optString("latest_app_version", BuildConfig.VERSION_NAME)
-        }
-        if (versionIsNewer(latest, BuildConfig.VERSION_NAME)) notifyUpdate(applicationContext, latest)
+        val result = withContext(Dispatchers.IO) { fetchAppUpdate(config.updateJsonUrl) }
+        val update = result.update
+        if (update != null && update.version.isNotBlank() &&
+            versionIsNewer(update.version, CURRENT_APP_VERSION)
+        ) notifyUpdate(applicationContext, update.version)
         Result.success()
     } catch (_: Exception) { Result.retry() }
 }
@@ -206,6 +273,7 @@ fun ZineApp() {
     var checking by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Ready") }
     var latestVersion by remember { mutableStateOf("") }
+    var updateDownloadUrl by remember { mutableStateOf<String?>(null) }
     var releases by remember { mutableStateOf(emptyList<Release>()) }
 
     LaunchedEffect(Unit) {
@@ -267,47 +335,63 @@ fun ZineApp() {
                     )
                     tab == "Updates" -> UpdatesScreen(
                         Modifier.fillMaxSize().padding(padding), arabic, checking, status,
-                        latestVersion, releases,
+                        latestVersion, updateDownloadUrl, releases,
                         onCheck = {
                             checking = true
                             status = if (arabic) "جارٍ التحقق..." else "Checking for updates..."
                             scope.launch {
                                 try {
-                                    val feed = withContext(Dispatchers.IO) {
-                                        val source = config ?: readConfig(context)
-                                        val request = Request.Builder().url(source.releasesUrl).build()
-                                        httpClient.newCall(request).execute().use { response ->
-                                            if (!response.isSuccessful) throw IllegalStateException("HTTP " + response.code)
-                                            JSONObject(response.body?.string().orEmpty())
+                                    val source = config ?: readConfig(context)
+                                    val result = withContext(Dispatchers.IO) {
+                                        fetchAppUpdate(source.updateJsonUrl)
+                                    }
+                                    val update = result.update
+                                    latestVersion = update?.version?.takeIf { it.isNotBlank() } ?: CURRENT_APP_VERSION
+                                    updateDownloadUrl = update?.downloadUrl
+                                    val hasUpdate = update != null &&
+                                        versionIsNewer(update.version, CURRENT_APP_VERSION)
+
+                                    // ROM release cards remain sourced from releases.json; app updates use update.json only.
+                                    releases = try {
+                                        withContext(Dispatchers.IO) {
+                                            val request = Request.Builder().url(source.releasesUrl).build()
+                                            httpClient.newCall(request).execute().use { response ->
+                                                if (!response.isSuccessful) throw IllegalStateException("HTTP " + response.code)
+                                                val feed = JSONObject(response.body?.string().orEmpty())
+                                                val entries = feed.optJSONArray("releases") ?: org.json.JSONArray()
+                                                (0 until entries.length()).map { i ->
+                                                    val entry = entries.getJSONObject(i)
+                                                    Release(
+                                                        entry.optString("title", "ZineROM"),
+                                                        entry.optString("version"),
+                                                        entry.optString("device_id"),
+                                                        entry.optString("download_url").takeIf { it.startsWith("https://") }
+                                                    )
+                                                }
+                                            }
                                         }
-                                    }
-                                    latestVersion = feed.optString("latest_app_version", BuildConfig.VERSION_NAME)
-                                    val hasUpdate = versionIsNewer(latestVersion, BuildConfig.VERSION_NAME)
-                                    val entries = feed.optJSONArray("releases") ?: org.json.JSONArray()
-                                    releases = (0 until entries.length()).map { i ->
-                                        val entry = entries.getJSONObject(i)
-                                        Release(
-                                            entry.optString("title", "ZineROM"),
-                                            entry.optString("version"),
-                                            entry.optString("device_id"),
-                                            entry.optString("download_url").takeIf { it.startsWith("https://") }
-                                        )
-                                    }
-                                    status = if (hasUpdate) {
-                                        if (arabic) "يتوفر تحديث جديد: " + latestVersion else "Update available: " + latestVersion
-                                    } else {
-                                        if (arabic) "أنت على أحدث إصدار: " + BuildConfig.VERSION_NAME
-                                        else "You're up to date: " + BuildConfig.VERSION_NAME
+                                    } catch (_: Exception) { emptyList() }
+
+                                    status = when {
+                                        result.hasTargetRules && update == null ->
+                                            if (arabic) "لا يوجد تحديث مخصص لهذا الجهاز" else "No update targeted to this device"
+                                        hasUpdate && updateDownloadUrl.isNullOrBlank() ->
+                                            if (arabic) "يتوفر إصدار جديد، لكن رابط التحميل غير متاح بعد" else "Update found, but the APK link is not available yet"
+                                        hasUpdate ->
+                                            if (arabic) "يتوفر تحديث جديد: " + latestVersion else "Update available: " + latestVersion
+                                        else ->
+                                            if (arabic) "أنت على أحدث إصدار: " + CURRENT_APP_VERSION
+                                            else "You're up to date: " + CURRENT_APP_VERSION
                                     }
                                     if (hasUpdate) notifyUpdate(context, latestVersion)
                                 } catch (error: Exception) {
                                     status = (if (arabic) "فشل التحقق: " else "Check failed: ") +
                                         (error.localizedMessage ?: "Network error")
+                                    updateDownloadUrl = null
                                 } finally { checking = false }
                             }
                         },
                         onChangelog = { openLink(context, config?.changelogUrl ?: DEFAULT_TELEGRAM) },
-                        onWorkflow = { openLink(context, config?.workflowUrl) },
                         onDownload = { openLink(context, it) }
                     )
                     tab == "About" -> AboutScreen(
@@ -406,7 +490,7 @@ private fun HomeScreen(
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                     StatPill(devices.size.toString(), if (arabic) "جهاز" else "DEVICES")
-                    StatPill("3.2.5", if (arabic) "الإصدار" else "VERSION")
+                    StatPill(CURRENT_APP_VERSION, if (arabic) "الإصدار" else "VERSION")
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = onBrowse, shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = Blue, contentColor = Color(0xFF07111D))) {
@@ -502,8 +586,8 @@ private fun DeviceCard(device: Device, arabic: Boolean, onClick: () -> Unit) {
 @Composable
 private fun UpdatesScreen(
     modifier: Modifier, arabic: Boolean, checking: Boolean, status: String,
-    latestVersion: String, releases: List<Release>, onCheck: () -> Unit,
-    onChangelog: () -> Unit, onWorkflow: () -> Unit, onDownload: (String?) -> Unit
+    latestVersion: String, updateDownloadUrl: String?, releases: List<Release>, onCheck: () -> Unit,
+    onChangelog: () -> Unit, onDownload: (String?) -> Unit
 ) {
     LazyColumn(modifier, contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
@@ -513,14 +597,26 @@ private fun UpdatesScreen(
         item {
             GlassPanel {
                 Text(if (arabic) "إصدار التطبيق الحالي" else "CURRENT APP VERSION", color = Color(0xFF9AAABD), fontSize = 9.sp, letterSpacing = 1.5.sp)
-                Text(BuildConfig.VERSION_NAME, color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+                Text(CURRENT_APP_VERSION, color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
                 Button(onClick = onCheck, enabled = !checking, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(15.dp), colors = ButtonDefaults.buttonColors(containerColor = Blue, contentColor = Color(0xFF07111D))) {
                     Icon(if (checking) Icons.Default.Sync else Icons.Default.SystemUpdate, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(if (checking) (if (arabic) "جارٍ الفحص..." else "Checking...") else (if (arabic) "فحص التحديثات" else "Check for updates"), fontWeight = FontWeight.Bold)
                 }
                 Text(status, color = if (status.contains("failed", true) || status.contains("فشل")) Color(0xFFFFA6A6) else Color(0xFF8CE6F0), fontSize = 12.sp)
-                if (latestVersion.isNotBlank()) Text(if (arabic) "آخر إصدار منشور: " + latestVersion else "Latest published version: " + latestVersion, color = Color(0xFF9AAABD), fontSize = 11.sp)
+                if (latestVersion.isNotBlank()) Text(if (arabic) "الإصدار المستهدف: " + latestVersion else "Server version: " + latestVersion, color = Color(0xFF9AAABD), fontSize = 11.sp)
+                if (!updateDownloadUrl.isNullOrBlank() && versionIsNewer(latestVersion, CURRENT_APP_VERSION)) {
+                    Button(
+                        onClick = { onDownload(updateDownloadUrl) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(15.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Blue, contentColor = Color(0xFF07111D))
+                    ) {
+                        Icon(Icons.Default.Download, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (arabic) "تحميل تحديث التطبيق" else "Download app update", fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
         item {
@@ -530,10 +626,7 @@ private fun UpdatesScreen(
                     Icon(Icons.Default.Article, contentDescription = null); Spacer(Modifier.width(8.dp))
                     Text(if (arabic) "سجل التغييرات على تيليجرام" else "Telegram changelog")
                 }
-                OutlinedButton(onClick = onWorkflow, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
-                    Icon(Icons.Default.Code, contentDescription = null); Spacer(Modifier.width(8.dp))
-                    Text(if (arabic) "فتح GitHub Actions" else "Open GitHub Actions")
-                }
+
             }
         }
         if (releases.isNotEmpty()) {
@@ -561,7 +654,7 @@ private fun AboutScreen(modifier: Modifier, arabic: Boolean, onWebsite: () -> Un
             }
             Text("ZineROM info", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Text(if (arabic) "التطبيق المرافق لمشروع ZineROM." else "The companion app for the ZineROM project.", color = Color(0xFF9AAABD), fontSize = 13.sp)
-            Text("Version " + BuildConfig.VERSION_NAME, color = Blue, fontSize = 12.sp)
+            Text("Version " + CURRENT_APP_VERSION, color = Blue, fontSize = 12.sp)
         }
         OutlinedButton(onClick = onWebsite, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
             Icon(Icons.Default.Language, contentDescription = null); Spacer(Modifier.width(8.dp)); Text(if (arabic) "الموقع الرسمي" else "Official website")
