@@ -54,6 +54,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 
 private const val DEFAULT_TELEGRAM = "https://t.me/ZineROMProject/13/4542"
+private const val DEFAULT_WEBSITE = "https://zinefather.github.io/ZineROM-Project-Site/"
 private const val NOTIFICATION_CHANNEL = "zinerom_updates"
 private const val CURRENT_APP_VERSION = "3.2.4" // Temporary comparison version for the 3.2.5 update test.
 private const val DEFAULT_UPDATE_JSON =
@@ -89,10 +90,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         createUpdateChannel(this)
-        val work = PeriodicWorkRequestBuilder<UpdateWorker>(24, TimeUnit.HOURS).build()
-        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-            "zinerom-update-check", ExistingPeriodicWorkPolicy.KEEP, work
-        )
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 325)
+        }
         if (FirebaseApp.getApps(this).isNotEmpty()) {
             FirebaseMessaging.getInstance().subscribeToTopic("zinerom_all")
             val model = Build.MODEL.uppercase()
@@ -121,20 +123,6 @@ private fun createUpdateChannel(context: Context) {
         )
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
-}
-
-private fun notifyUpdate(context: Context, version: String) {
-    if (Build.VERSION.SDK_INT >= 33 &&
-        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-    ) return
-    val notification = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL)
-        .setSmallIcon(android.R.drawable.stat_sys_download_done)
-        .setContentTitle("ZineROM info update available")
-        .setContentText("Version " + version + " is available. Open Telegram for the changelog.")
-        .setAutoCancel(true)
-        .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-        .build()
-    try { NotificationManagerCompat.from(context).notify(325, notification) } catch (_: SecurityException) { }
 }
 
 private fun versionIsNewer(remote: String, current: String): Boolean {
@@ -247,19 +235,6 @@ private fun readDevices(context: Context): List<Device> {
     }
 }
 
-class UpdateWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
-    override suspend fun doWork(): Result = try {
-        val config = readConfig(applicationContext)
-        val result = withContext(Dispatchers.IO) { fetchAppUpdate(config.updateJsonUrl) }
-        val update = result.update
-        if (update != null && update.version.isNotBlank() &&
-            versionIsNewer(update.version, CURRENT_APP_VERSION)
-        ) notifyUpdate(applicationContext, update.version)
-        Result.success()
-    } catch (_: Exception) { Result.retry() }
-}
-
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ZineApp() {
@@ -273,7 +248,6 @@ fun ZineApp() {
     var checking by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Ready") }
     var latestVersion by remember { mutableStateOf("") }
-    var updateDownloadUrl by remember { mutableStateOf<String?>(null) }
     var releases by remember { mutableStateOf(emptyList<Release>()) }
 
     LaunchedEffect(Unit) {
@@ -335,7 +309,7 @@ fun ZineApp() {
                     )
                     tab == "Updates" -> UpdatesScreen(
                         Modifier.fillMaxSize().padding(padding), arabic, checking, status,
-                        latestVersion, updateDownloadUrl, releases,
+                        latestVersion, releases,
                         onCheck = {
                             checking = true
                             status = if (arabic) "جارٍ التحقق..." else "Checking for updates..."
@@ -347,7 +321,6 @@ fun ZineApp() {
                                     }
                                     val update = result.update
                                     latestVersion = update?.version?.takeIf { it.isNotBlank() } ?: CURRENT_APP_VERSION
-                                    updateDownloadUrl = update?.downloadUrl
                                     val hasUpdate = update != null &&
                                         versionIsNewer(update.version, CURRENT_APP_VERSION)
 
@@ -375,23 +348,20 @@ fun ZineApp() {
                                     status = when {
                                         result.hasTargetRules && update == null ->
                                             if (arabic) "لا يوجد تحديث مخصص لهذا الجهاز" else "No update targeted to this device"
-                                        hasUpdate && updateDownloadUrl.isNullOrBlank() ->
-                                            if (arabic) "يتوفر إصدار جديد، لكن رابط التحميل غير متاح بعد" else "Update found, but the APK link is not available yet"
                                         hasUpdate ->
-                                            if (arabic) "يتوفر تحديث جديد: " + latestVersion else "Update available: " + latestVersion
+                                            if (arabic) "يتوفر تحديث جديد: " + latestVersion + " — افتح الموقع للتفاصيل"
+                                            else "Update available: " + latestVersion + " — open the website for details"
                                         else ->
                                             if (arabic) "أنت على أحدث إصدار: " + CURRENT_APP_VERSION
                                             else "You're up to date: " + CURRENT_APP_VERSION
                                     }
-                                    if (hasUpdate) notifyUpdate(context, latestVersion)
                                 } catch (error: Exception) {
                                     status = (if (arabic) "فشل التحقق: " else "Check failed: ") +
                                         (error.localizedMessage ?: "Network error")
-                                    updateDownloadUrl = null
                                 } finally { checking = false }
                             }
                         },
-                        onChangelog = { openLink(context, config?.changelogUrl ?: DEFAULT_TELEGRAM) },
+                        onChangelog = { openLink(context, config?.websiteUrl ?: DEFAULT_WEBSITE) },
                         onDownload = { openLink(context, it) }
                     )
                     tab == "About" -> AboutScreen(
@@ -586,7 +556,7 @@ private fun DeviceCard(device: Device, arabic: Boolean, onClick: () -> Unit) {
 @Composable
 private fun UpdatesScreen(
     modifier: Modifier, arabic: Boolean, checking: Boolean, status: String,
-    latestVersion: String, updateDownloadUrl: String?, releases: List<Release>, onCheck: () -> Unit,
+    latestVersion: String, releases: List<Release>, onCheck: () -> Unit,
     onChangelog: () -> Unit, onDownload: (String?) -> Unit
 ) {
     LazyColumn(modifier, contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -605,18 +575,7 @@ private fun UpdatesScreen(
                 }
                 Text(status, color = if (status.contains("failed", true) || status.contains("فشل")) Color(0xFFFFA6A6) else Color(0xFF8CE6F0), fontSize = 12.sp)
                 if (latestVersion.isNotBlank()) Text(if (arabic) "الإصدار المستهدف: " + latestVersion else "Server version: " + latestVersion, color = Color(0xFF9AAABD), fontSize = 11.sp)
-                if (!updateDownloadUrl.isNullOrBlank() && versionIsNewer(latestVersion, CURRENT_APP_VERSION)) {
-                    Button(
-                        onClick = { onDownload(updateDownloadUrl) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(15.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Blue, contentColor = Color(0xFF07111D))
-                    ) {
-                        Icon(Icons.Default.Download, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(if (arabic) "تحميل تحديث التطبيق" else "Download app update", fontWeight = FontWeight.Bold)
-                    }
-                }
+
             }
         }
         item {
@@ -624,7 +583,7 @@ private fun UpdatesScreen(
                 Text(if (arabic) "روابط المشروع" else "PROJECT LINKS", color = Color(0xFF9AAABD), fontSize = 9.sp, letterSpacing = 1.5.sp)
                 OutlinedButton(onClick = onChangelog, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
                     Icon(Icons.Default.Article, contentDescription = null); Spacer(Modifier.width(8.dp))
-                    Text(if (arabic) "سجل التغييرات على تيليجرام" else "Telegram changelog")
+                    Text(if (arabic) "فتح الموقع الرسمي" else "Open official website")
                 }
 
             }
