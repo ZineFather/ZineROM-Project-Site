@@ -61,7 +61,9 @@ import androidx.core.content.ContextCompat
 private const val DEFAULT_TELEGRAM = "https://t.me/ZineROMProject/13/4542"
 private const val DEFAULT_WEBSITE = "https://zinefather.github.io/ZineROM-Project-Site/"
 private const val NOTIFICATION_CHANNEL = "zinerom_alerts_v2"
-private const val CURRENT_APP_VERSION = "3.2.6"
+private val CURRENT_APP_VERSION: String get() = BuildConfig.VERSION_NAME
+private const val MIN_REQUIRED_APP_VERSION = "3.2.5"
+private const val BUG_REPORT_URL = "https://t.me/ZineROMProject/9"
 private const val DEFAULT_UPDATE_JSON =
     "https://raw.githubusercontent.com/ZineFather/ZineROM-Project-Site/zinerom-info-development/remote/update.json"
 private val httpClient = OkHttpClient()
@@ -80,6 +82,7 @@ data class AppUpdate(
     val notes: String?
 )
 data class UpdateCheckResult(val update: AppUpdate?, val hasTargetRules: Boolean)
+data class StartupNotice(val title: String, val message: String, val url: String, val action: String)
 data class Rom(val title: String, val version: String, val downloadUrl: String)
 data class Device(
     val id: String, val name: String, val model: String?, val versions: List<String>,
@@ -130,15 +133,37 @@ private fun createUpdateChannel(context: Context) {
     }
 }
 
-private fun versionIsNewer(remote: String, current: String): Boolean {
-    val a = remote.trim().removePrefix("v").split(".").map { it.toIntOrNull() ?: 0 }
-    val b = current.trim().removePrefix("v").split(".").map { it.toIntOrNull() ?: 0 }
+private fun parseVersionParts(value: String): List<Int>? {
+    val normalized = value.trim().removePrefix("v").removePrefix("V")
+    if (!normalized.matches(Regex("""\d+(\.\d+)*"""))) return null
+    return normalized.split(".").map { it.toIntOrNull() ?: return null }
+}
+
+private fun compareVersions(left: String, right: String): Int? {
+    val a = parseVersionParts(left) ?: return null
+    val b = parseVersionParts(right) ?: return null
     for (index in 0 until maxOf(a.size, b.size)) {
-        val left = a.getOrElse(index) { 0 }
-        val right = b.getOrElse(index) { 0 }
-        if (left != right) return left > right
+        val x = a.getOrElse(index) { 0 }
+        val y = b.getOrElse(index) { 0 }
+        if (x != y) return x.compareTo(y)
     }
-    return false
+    return 0
+}
+
+private fun versionIsNewer(remote: String, current: String): Boolean =
+    (compareVersions(remote, current) ?: 0) > 0
+
+@Suppress("DEPRECATION")
+private fun readInstalledVersion(context: Context): String? {
+    val packageInfo = if (Build.VERSION.SDK_INT >= 33) {
+        context.packageManager.getPackageInfo(
+            context.packageName,
+            PackageManager.PackageInfoFlags.of(0)
+        )
+    } else {
+        context.packageManager.getPackageInfo(context.packageName, 0)
+    }
+    return packageInfo.versionName?.trim()?.takeIf { it.isNotEmpty() }
 }
 
 private fun readStringSet(json: JSONObject, vararg keys: String): Set<String> {
@@ -257,6 +282,7 @@ fun ZineApp() {
     var status by remember { mutableStateOf("Ready") }
     var latestVersion by remember { mutableStateOf("") }
     var releases by remember { mutableStateOf(emptyList<Release>()) }
+    var startupNotice by remember { mutableStateOf<StartupNotice?>(null) }
 
     val tabs = listOf(
         MainTab("home", "Home", "الرئيسية", Icons.Default.Home),
@@ -268,9 +294,49 @@ fun ZineApp() {
     val currentRoute = backStackEntry?.destination?.route ?: "home"
 
     LaunchedEffect(Unit) {
+        val loadedConfig = withContext(Dispatchers.IO) {
+            runCatching { readConfig(context) }.getOrNull()
+        }
+        if (loadedConfig != null) config = loadedConfig
+
         withContext(Dispatchers.IO) {
-            config = readConfig(context)
-            devices = readDevices(context)
+            runCatching { readDevices(context) }.getOrNull()?.let { devices = it }
+        }
+
+        val installedVersion = withContext(Dispatchers.IO) {
+            runCatching { readInstalledVersion(context) }.getOrNull()
+        }
+
+        when {
+            installedVersion.isNullOrBlank() || compareVersions(installedVersion, MIN_REQUIRED_APP_VERSION) == null -> {
+                startupNotice = StartupNotice(
+                    title = if (arabic) "مشكلة في قراءة إصدار التطبيق" else "Build information issue",
+                    message = if (arabic)
+                        "تعذر التعرف على رقم إصدار التطبيق. من فضلك أرسل تقريرًا للمطورين."
+                    else
+                        "The installed app version could not be detected. Please report this issue to the developers.",
+                    url = BUG_REPORT_URL,
+                    action = if (arabic) "إرسال تقرير" else "Report issue"
+                )
+            }
+            compareVersions(installedVersion, MIN_REQUIRED_APP_VERSION)!! < 0 -> {
+                val updateUrl = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val source = loadedConfig ?: readConfig(context)
+                        fetchAppUpdate(source.updateJsonUrl).update?.downloadUrl
+                    }.getOrNull()
+                } ?: loadedConfig?.websiteUrl?.takeIf { it.startsWith("https://") } ?: DEFAULT_WEBSITE
+
+                startupNotice = StartupNotice(
+                    title = if (arabic) "تحديث ZineROM متاح" else "ZineROM update available",
+                    message = if (arabic)
+                        "إصدار تطبيقك $installedVersion أقدم من الإصدار المطلوب $MIN_REQUIRED_APP_VERSION. حدّث التطبيق للحصول على أحدث الميزات والإصلاحات."
+                    else
+                        "Your app version $installedVersion is older than the required version $MIN_REQUIRED_APP_VERSION. Update the app to get the latest features and fixes.",
+                    url = updateUrl,
+                    action = if (arabic) "تحميل التحديث" else "Get update"
+                )
+            }
         }
     }
 
@@ -279,6 +345,24 @@ fun ZineApp() {
         background = Color(0xFF070B12), surface = Color(0xFF101927)
     )) {
         CompositionLocalProvider(LocalLayoutDirection provides if (arabic) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+            startupNotice?.let { notice ->
+                AlertDialog(
+                    onDismissRequest = { startupNotice = null },
+                    title = { Text(notice.title) },
+                    text = { Text(notice.message) },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            startupNotice = null
+                            openLink(context, notice.url)
+                        }) { Text(notice.action) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { startupNotice = null }) {
+                            Text(if (arabic) "إغلاق" else "Dismiss")
+                        }
+                    }
+                )
+            }
             Scaffold(
                 containerColor = Color(0xFF070B12),
                 topBar = {
