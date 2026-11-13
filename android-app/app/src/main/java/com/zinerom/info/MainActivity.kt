@@ -156,22 +156,19 @@ private fun versionIsNewer(remote: String, current: String): Boolean =
 private data class RomBuildInfo(val buildNumber: String, val version: String)
 
 private fun readRomBuildInfo(): RomBuildInfo? {
-    // Android Settings > About phone > Software information > Build number.
-    val candidates = listOf(Build.DISPLAY, Build.VERSION.INCREMENTAL, Build.ID)
-        .map { it.trim() }
-        .filter { it.isNotEmpty() }
+    // Build.DISPLAY is the Android Build number shown in Settings.
+    val buildNumber = Build.DISPLAY.trim().ifEmpty {
+        Build.VERSION.INCREMENTAL.trim()
+    }
+    if (buildNumber.isEmpty()) return null
 
-    val combinedBuild = candidates.joinToString(" | ")
-    val markerIndex = combinedBuild.indexOf("ZineROM", ignoreCase = true)
-    if (markerIndex < 0) return null
-
-    val versionPattern = Regex("""(?<!\d)(\d+\.\d+\.\d+(?:\.\d+)?)(?!\d)""")
-    val afterMarker = combinedBuild.substring(markerIndex)
-    val beforeMarker = combinedBuild.substring(0, markerIndex)
-    val version = (versionPattern.find(afterMarker) ?: versionPattern.find(beforeMarker))
-        ?.groupValues?.getOrNull(1)
+    // Only a semantic version in the ROM Build number is accepted.
+    // Stock/non-ZineROM builds without this value must never be marked up to date.
+    val version = Regex("""(?<!\d)(\d+\.\d+\.\d+(?:\.\d+)?)(?!\d)""")
+        .find(buildNumber)?.groupValues?.getOrNull(1)
         ?: return null
-    return RomBuildInfo(combinedBuild, version)
+
+    return RomBuildInfo(buildNumber, version)
 }
 
 private fun readStringSet(json: JSONObject, vararg keys: String): Set<String> {
