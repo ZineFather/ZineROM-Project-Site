@@ -141,7 +141,7 @@ jobs:
                 android: {
                   priority: "HIGH",
                   notification: {
-                    channel_id: "zinerom_updates",
+                    channel_id: "zinerom_alerts_v2",
                     sound: "default"
                   }
                 }
