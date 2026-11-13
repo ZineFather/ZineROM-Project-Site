@@ -1162,71 +1162,52 @@ private fun DeviceAssetImage(
 
 @Composable
 private fun ModulesScreen(
-    devices: List<Device>,
+    modules: List<ModuleCatalogItem>,
     arabic: Boolean,
     modifier: Modifier = Modifier,
     onSaveModule: (DeviceModule) -> Unit,
     onOpenDevice: (Device) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
-    val allModules = remember(devices) { devices.flatMap { device -> device.modules.map { device to it } } }
-    val filtered = remember(allModules, query) {
-        allModules.filter { (device, module) ->
-            device.name.contains(query, true) || (device.model?.contains(query, true) == true) ||
-                module.title.contains(query, true) || (module.description?.contains(query, true) == true)
-        }
-    }
+    val filtered = remember(modules, query) { modules.filter { it.title.contains(query, true) || it.deviceName.contains(query, true) || (it.description?.contains(query, true) == true) } }
     LazyColumn(modifier, contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
         item {
             Text(if (arabic) "الموديولات" else "Modules", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
-            Text(if (arabic) "كل الموديولات المتاحة لأجهزة ZineROM." else "Browse modules available for supported ZineROM devices.", color = Color(0xFF9AAABD), fontSize = 12.sp)
+            Text(if (arabic) "موديولات وملفات تعريف المشروع." else "Browse project modules and performance profile references.", color = Color(0xFF9AAABD), fontSize = 12.sp)
             Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                .background(Color(0xFF101722)).border(1.dp, Color.White.copy(alpha = .10f), RoundedCornerShape(16.dp))
-                .padding(horizontal = 14.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF101722)).border(1.dp, Color.White.copy(alpha = .10f), RoundedCornerShape(16.dp)).padding(horizontal = 14.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF91A2B8))
                 Spacer(Modifier.width(10.dp))
-                BasicTextField(value = query, onValueChange = { query = it }, modifier = Modifier.weight(1f),
-                    singleLine = true, textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.White),
-                    decorationBox = { inner ->
-                        if (query.isEmpty()) Text(if (arabic) "ابحث باسم الموديول أو الجهاز" else "Search modules or devices", color = Color(0xFF91A2B8), fontSize = 13.sp)
-                        inner()
-                    })
-                if (query.isNotEmpty()) Icon(Icons.Default.Close, contentDescription = if (arabic) "مسح" else "Clear",
-                    tint = Blue, modifier = Modifier.clickable { query = "" }.size(20.dp))
+                BasicTextField(value = query, onValueChange = { query = it }, modifier = Modifier.weight(1f), singleLine = true, textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.White), decorationBox = { inner -> if (query.isEmpty()) Text(if (arabic) "ابحث باسم الموديول أو الجهاز" else "Search modules or device", color = Color(0xFF91A2B8), fontSize = 13.sp); inner() })
+                if (query.isNotEmpty()) Icon(Icons.Default.Close, contentDescription = if (arabic) "مسح" else "Clear", tint = Blue, modifier = Modifier.clickable { query = "" }.size(20.dp))
             }
-            Text("${filtered.size} " + if (arabic) "موديول" else if (filtered.size == 1) "module" else "modules",
-                color = Blue, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
+            Text(filtered.size.toString() + " " + if (arabic) "موديول" else if (filtered.size == 1) "module" else "modules", color = Blue, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
         }
-        items(filtered, key = { it.first.id + it.second.assetPath }, contentType = { "module" }) { (device, module) ->
+        items(filtered, key = { it.id }, contentType = { "module" }) { module ->
             GlassPanel {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Extension, contentDescription = null, tint = Blue, modifier = Modifier.size(25.dp))
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
                         Text(module.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        Text(device.name + "  •  " + (device.model ?: device.id), color = Color(0xFF8FAAC8), fontSize = 10.sp)
+                        Text(module.deviceName, color = Color(0xFF8FAAC8), fontSize = 10.sp)
                     }
                 }
+                module.version?.let { Text(it, color = Blue, fontSize = 10.sp) }
                 module.description?.let { Text(it, color = Color(0xFF9AAABD), fontSize = 12.sp, lineHeight = 18.sp) }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { onSaveModule(module) }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Blue, contentColor = Color(0xFF07111D))) {
-                        Icon(Icons.Default.Download, contentDescription = null); Spacer(Modifier.width(6.dp))
-                        Text(if (arabic) "حفظ" else "Save")
+                if (module.assetPath != null) {
+                    Button(onClick = { onSaveModule(DeviceModule(module.title, module.description, module.version, module.assetPath)) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = Blue, contentColor = Color(0xFF07111D))) {
+                        Icon(Icons.Default.Download, contentDescription = null); Spacer(Modifier.width(6.dp)); Text(if (arabic) "حفظ" else "Save")
                     }
-                    OutlinedButton(onClick = { onOpenDevice(device) }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp)) {
-                        Text(if (arabic) "الجهاز" else "Device", color = Color.White)
-                    }
+                } else {
+                    Text(if (arabic) "مرجع تعريفي فقط — لا توجد حزمة ZIP موثقة للتثبيت." else "Profile reference only — no verified flashable ZIP is attached.", color = Color(0xFFFFD28A), fontSize = 11.sp)
                 }
+                module.device?.let { device -> OutlinedButton(onClick = { onOpenDevice(device) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) { Text(if (arabic) "فتح الجهاز" else "Open device", color = Color.White) } }
             }
         }
-        if (filtered.isEmpty()) item {
-            GlassPanel { Text(if (arabic) "لا توجد موديولات مطابقة." else "No matching modules yet.", color = Color(0xFF9AAABD), fontSize = 13.sp) }
-        }
+        if (filtered.isEmpty()) item { GlassPanel { Text(if (arabic) "لا توجد موديولات مطابقة." else "No matching modules yet.", color = Color(0xFF9AAABD), fontSize = 13.sp) } }
     }
 }
-
 @Composable
 private fun GlassPanel(content: @Composable ColumnScope.() -> Unit) {
     Column(
