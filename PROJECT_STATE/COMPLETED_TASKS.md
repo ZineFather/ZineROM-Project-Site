@@ -1,9 +1,15 @@
 # Completed Tasks
-- Inspected repository and confirmed main is the production website branch.
+- Inspected the production website repository and catalog.
 - Created isolated branch zinerom-info-development.
-- Added native Android Gradle project with Kotlin, Compose and Material 3.
-- Added ZineROM-branded Home, Devices, Updates and About screens.
-- Ported the 11 existing device names, model identifiers and listed One UI versions from the website catalog.
-- Added manual release-feed connectivity check.
-- Scheduled unique WorkManager update checks at a 24-hour interval.
-- Added GitHub Actions workflow to build and upload the debug APK.
+- Added native Android Gradle project with Kotlin, Jetpack Compose and Material 3.
+- Added ZineROM home, device catalog, update, notifications and about screens.
+- Ported the 11 existing device entries and their known model identifiers/One UI versions.
+- Added manual remote release-feed retrieval and visible release entries with download links.
+- Scheduled unique WorkManager update checks every 24 hours.
+- Added Firebase Messaging client dependency, conditional Google Services configuration and device/all-device topic subscription.
+- Added notification display, local history and an in-app notification preference switch.
+- Added an Arabic/English UI toggle with RTL/LTR direction.
+- Added Android CI workflow that builds, verifies and uploads the debug APK.
+- Confirmed one successful APK build and artifact upload (workflow run 43397611998).
+- Added configurable GitHub Actions remote-control workflow for release metadata and FCM notifications.
+- Added remote-control documentation and persistent project checkpoints.

@@ -1,6 +1,6 @@
 # Next Action
-1. Verify the Android GitHub Actions build and fix compilation failures.
-2. Implement the workflow_dispatch remote release/notification control panel.
-3. Port complete device release details and installation information from the website's source data.
-4. Add Firebase topic subscription, notification history and preference controls.
-5. Keep all changes on zinerom-info-development; never commit directly to main.
+1. Inspect the latest Android CI run for the current development branch head.
+2. Fix any build errors and verify the newest APK artifact.
+3. Finish full device-specific release details and installation guide navigation from the existing website data.
+4. Verify FCM topic delivery after Firebase client configuration and the server service-account secret are supplied.
+5. Keep all work on zinerom-info-development; do not modify main directly.
