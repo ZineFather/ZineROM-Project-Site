@@ -422,7 +422,7 @@ fun ZineApp() {
 
     val tabs = listOf(
         MainTab("home", "Home", "الرئيسية", Icons.Default.Home),
-        MainTab("devices", "Devices", "الأجهزة", Icons.Default.Devices),
+        MainTab("devices", "Devices", "الأجهزة", Icons.Default.PhoneAndroid),
         MainTab("modules", "Modules", "الموديولات", Icons.Default.Extension),
         MainTab("updates", "Updates", "التحديثات", Icons.Default.SystemUpdate)
     )
