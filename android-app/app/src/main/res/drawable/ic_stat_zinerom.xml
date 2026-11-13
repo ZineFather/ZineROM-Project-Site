@@ -4,8 +4,8 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <!-- Monochrome alpha mask: transparent canvas, compact white glyph with safe padding. -->
+    <!-- Status-bar glyph: transparent canvas, monochrome Z with balanced safe margins. -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M7,7h10v2L10,15h7v2H7v-2L14,9H7z" />
+        android:pathData="M4.5,5.5h15v3L9.6,15.5h9.9v3h-15v-3l9.9,-7h-9.9z" />
 </vector>
