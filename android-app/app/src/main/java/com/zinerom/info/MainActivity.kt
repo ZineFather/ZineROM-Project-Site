@@ -97,20 +97,15 @@ class MainActivity : ComponentActivity() {
         }
         if (FirebaseApp.getApps(this).isNotEmpty()) {
             FirebaseMessaging.getInstance().subscribeToTopic("zinerom_all")
-            val model = Build.MODEL.uppercase()
-            val topic = when {
-                model.startsWith("SM-A528") -> "zinerom_a52s-5g"
-                model.startsWith("SM-A536") -> "zinerom_a53-5g"
-                model.startsWith("SM-A346") -> "zinerom_a34-5g"
-                model.startsWith("SM-A256") -> "zinerom_a25-5g"
-                model == "SM-A155F" -> "zinerom_a15-4g"
-                model == "SM-A165F" -> "zinerom_a16-4g"
-                model == "SM-A115F" -> "zinerom_a11-4g"
-                model == "SM-A245F" -> "zinerom_a24-4g"
-                model == "SM-X216B" -> "zinerom_tab-a9-plus-5g-x216b"
-                else -> null
-            }
-            if (topic != null) FirebaseMessaging.getInstance().subscribeToTopic(topic)
+                .addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        android.util.Log.i("ZineFCM", "Subscribed to zinerom_all")
+                    } else {
+                        android.util.Log.e("ZineFCM", "Failed to subscribe to zinerom_all", task.exception)
+                    }
+                }
+        } else {
+            android.util.Log.e("ZineFCM", "FirebaseApp is not initialized")
         }
         setContent { ZineApp() }
     }
