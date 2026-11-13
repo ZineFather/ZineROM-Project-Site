@@ -155,5 +155,14 @@
       "download_url": "https://zinefather.github.io/ZineROM-Project-Site/",
       "image_asset": "device-images/tab-a9-plus-5g-x216b.png"
     }
+  ],
+  "modules": [
+    {
+      "id": "galaxy-s26-ultra-performance-high-fps-profile",
+      "title": "Galaxy S26 Ultra Performance & High FPS Profile Module",
+      "device_name": "Galaxy S26 Ultra",
+      "version": "Profile reference",
+      "description": "Performance and high-frame-rate profile reference. Informational only: no verified flashable ZIP or device-specific configuration has been supplied, so this entry does not change system settings or unlock frame rates."
+    }
   ]
 }
