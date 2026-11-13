@@ -26,7 +26,7 @@ on:
         required: false
         type: string
       target:
-        description: "Who should receive this notification?"
+        description: "Device this notification is about (all installs still receive it)"
         required: true
         type: choice
         options:
@@ -53,7 +53,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   send:
@@ -61,8 +60,9 @@ jobs:
     steps:
       - name: Validate Firebase credentials
         env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ (secrets.FIREBASE_SERVICE_ACCOUNT || secrets.FCM_SERVICE_ACCOUNT_JSON) }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT || secrets.FCM_SERVICE_ACCOUNT_JSON }}
         run: |
+          set -euo pipefail
           if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
             echo "::error::Add FIREBASE_SERVICE_ACCOUNT or FCM_SERVICE_ACCOUNT_JSON in repository Actions secrets."
             exit 1
@@ -75,7 +75,7 @@ jobs:
         id: auth
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ (secrets.FIREBASE_SERVICE_ACCOUNT || secrets.FCM_SERVICE_ACCOUNT_JSON) }}
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT || secrets.FCM_SERVICE_ACCOUNT_JSON }}
           token_format: access_token
 
       - name: Send FCM topic notification
@@ -89,6 +89,8 @@ jobs:
           BUTTON_TEXT: ${{ inputs.button_text }}
           BUTTON_URL: ${{ inputs.button_url }}
         run: |
+          set -euo pipefail
+
           TOPIC="zinerom_all"
           case "$TARGET" in
             ALL) TARGET_LABEL="All devices" ;;
@@ -103,12 +105,16 @@ jobs:
             TAB_A9_PLUS) TARGET_LABEL="Galaxy Tab A9+ 5G (TAB_A9_PLUS)" ;;
             *) echo "::error::Unsupported target: $TARGET"; exit 1 ;;
           esac
-          DISPLAY_MESSAGE="$MESSAGE"
 
           case "$BUTTON_URL" in
             https://*) ;;
             *) echo "::error::button_url must start with https://"; exit 1 ;;
           esac
+
+          DISPLAY_MESSAGE="$MESSAGE"
+          if [ "$TARGET" != "ALL" ]; then
+            DISPLAY_MESSAGE="$MESSAGE"$'\n\n'"Target device: $TARGET_LABEL"
+          fi
 
           PAYLOAD=$(jq -n \
             --arg topic "$TOPIC" \
@@ -126,44 +132,8 @@ jobs:
                   title: $title,
                   message: $message,
                   type: $type,
-                  target_version: $version,\n                  target_device: $target_device,
-                  button_text: $button_text,
-                  button_url: $button_url
-                },
-                android: { priority: "HIGH" }
-              }
-            }')
-
-          curl --fail-with-body --silent --show-error \
-            -X POST "https://fcm.googleapis.com/v1/projects/$PROJECT_ID/messages:send" \
-            -H "Authorization: Bearer $ACCESS_TOKEN" \
-            -H "Content-Type: application/json; charset=UTF-8" \
-            -d "$PAYLOAD"
-
-          echo "Notification sent to all app installs via topic: $TOPIC (target: $TARGET_LABEL)"
-\n\n'"Target device: $TARGET_LABEL"
-
-          case "$BUTTON_URL" in
-            https://*) ;;
-            *) echo "::error::button_url must start with https://"; exit 1 ;;
-          esac
-
-          PAYLOAD=$(jq -n \
-            --arg topic "$TOPIC" \
-            --arg title "$TITLE" \
-            --arg message "$MESSAGE" \
-            --arg type "$NOTICE_TYPE" \
-            --arg version "$TARGET_VERSION" \
-            --arg button_text "$BUTTON_TEXT" \
-            --arg button_url "$BUTTON_URL" \
-            '{
-              message: {
-                topic: $topic,
-                data: {
-                  title: $title,
-                  message: $message,
-                  type: $type,
                   target_version: $version,
+                  target_device: $target_device,
                   button_text: $button_text,
                   button_url: $button_url
                 },
@@ -177,4 +147,5 @@ jobs:
             -H "Content-Type: application/json; charset=UTF-8" \
             -d "$PAYLOAD"
 
-          echo "Notification sent to topic: $TOPIC"
+          echo
+          echo "Notification sent to all app installs via topic: $TOPIC (target: $TARGET_LABEL)"
