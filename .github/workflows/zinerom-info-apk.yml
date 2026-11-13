@@ -9,6 +9,10 @@ on:
       - ".github/workflows/zinerom-info-apk.yml"
   workflow_dispatch:
 
+concurrency:
+  group: zinerom-info-apk-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
