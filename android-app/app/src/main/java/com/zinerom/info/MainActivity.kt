@@ -96,6 +96,7 @@ data class UpdateCheckResult(val update: AppUpdate?, val hasTargetRules: Boolean
 data class StartupNotice(val title: String, val message: String, val url: String, val action: String)
 data class Rom(val title: String, val version: String, val downloadUrl: String)
 data class DeviceModule(val title: String, val description: String?, val version: String?, val assetPath: String)
+data class ModuleCatalogItem(val id: String, val title: String, val description: String?, val version: String?, val assetPath: String?, val deviceName: String, val device: Device?)
 data class Device(
     val id: String, val name: String, val model: String?, val versions: List<String>,
     val imageAssetPath: String?, val description: String?, val downloadUrl: String?, val roms: List<Rom>,
