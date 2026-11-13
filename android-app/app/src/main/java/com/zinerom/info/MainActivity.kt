@@ -6,11 +6,18 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.ContentValues
+import android.os.Environment
+import android.provider.MediaStore
+import android.widget.Toast
+import java.io.File
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.text.BasicTextField
@@ -86,7 +93,7 @@ data class AppUpdate(
 data class UpdateCheckResult(val update: AppUpdate?, val hasTargetRules: Boolean)
 data class StartupNotice(val title: String, val message: String, val url: String, val action: String)
 data class Rom(val title: String, val version: String, val downloadUrl: String)
-data class DeviceModule(val title: String, val description: String?, val version: String?, val downloadUrl: String)
+data class DeviceModule(val title: String, val description: String?, val version: String?, val assetPath: String)
 data class Device(
     val id: String, val name: String, val model: String?, val versions: List<String>,
     val imageUrl: String?, val description: String?, val downloadUrl: String?, val roms: List<Rom>,
@@ -273,6 +280,41 @@ private fun fetchAppUpdate(updateJsonUrl: String): UpdateCheckResult {
     return UpdateCheckResult(parseAppUpdate(root), false)
 }
 
+
+private fun saveModuleToDownloads(context: Context, module: DeviceModule) {
+    val fileName = module.assetPath.substringAfterLast('/').ifBlank { "ZineROM-module.zip" }
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        val values = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+            put(MediaStore.Downloads.MIME_TYPE, "application/zip")
+            put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/ZineROM")
+            put(MediaStore.Downloads.IS_PENDING, 1)
+        }
+        val resolver = context.contentResolver
+        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            ?: throw java.io.IOException("Could not create Downloads file")
+        try {
+            resolver.openOutputStream(uri)?.use { output ->
+                context.assets.open(module.assetPath).use { input -> input.copyTo(output) }
+            } ?: throw java.io.IOException("Could not open Downloads output")
+            val ready = ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }
+            resolver.update(uri, ready, null, null)
+        } catch (error: Exception) {
+            resolver.delete(uri, null, null)
+            throw error
+        }
+    } else {
+        @Suppress("DEPRECATION")
+        val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        val folder = File(downloads, "ZineROM")
+        if (!folder.exists() && !folder.mkdirs()) throw java.io.IOException("Could not create Downloads/ZineROM")
+        val destination = File(folder, fileName)
+        context.assets.open(module.assetPath).use { input ->
+            destination.outputStream().use { output -> input.copyTo(output) }
+        }
+    }
+}
+
 private fun openLink(context: Context, url: String?) {
     if (!url.isNullOrBlank() && url.startsWith("https://")) {
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
@@ -304,13 +346,13 @@ private fun readDevices(context: Context): List<Device> {
         val moduleArray = item.optJSONArray("modules")
         val modules = if (moduleArray == null) emptyList() else (0 until moduleArray.length()).mapNotNull { n ->
             val entry = moduleArray.optJSONObject(n) ?: return@mapNotNull null
-            val url = entry.optString("download_url")
-            if (!url.startsWith("https://")) return@mapNotNull null
+            val assetPath = entry.optString("asset_path")
+            if (!assetPath.startsWith("modules/") || assetPath.contains("..")) return@mapNotNull null
             DeviceModule(
                 title = entry.optString("title", "Device module"),
                 description = entry.optString("description").takeIf { it.isNotBlank() },
                 version = entry.optString("version").takeIf { it.isNotBlank() },
-                downloadUrl = url
+                assetPath = assetPath
             )
         }
         Device(
@@ -335,6 +377,34 @@ private data class MainTab(val route: String, val label: String, val arabicLabel
 fun ZineApp() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var pendingModule by remember { mutableStateOf<DeviceModule?>(null) }
+    val storagePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val module = pendingModule
+        pendingModule = null
+        if (granted && module != null) {
+            scope.launch {
+                val result = withContext(Dispatchers.IO) { runCatching { saveModuleToDownloads(context, module) } }
+                Toast.makeText(context, if (result.isSuccess) "Saved to Downloads/ZineROM" else "Could not save module: ${result.exceptionOrNull()?.message ?: "Unknown error"}", Toast.LENGTH_LONG).show()
+            }
+        } else if (!granted) {
+            Toast.makeText(context, "Storage permission is required on Android 8/9", Toast.LENGTH_LONG).show()
+        }
+    }
+    val saveModule: (DeviceModule) -> Unit = { module ->
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+        ) {
+            pendingModule = module
+            storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        } else {
+            scope.launch {
+                val result = withContext(Dispatchers.IO) { runCatching { saveModuleToDownloads(context, module) } }
+                Toast.makeText(context, if (result.isSuccess) "Saved to Downloads/ZineROM" else "Could not save module: ${result.exceptionOrNull()?.message ?: "Unknown error"}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
     val navController = rememberNavController()
     var config by remember { mutableStateOf<AppConfig?>(null) }
     var devices by remember { mutableStateOf(emptyList<Device>()) }
@@ -492,7 +562,8 @@ fun ZineApp() {
                                 arabic = arabic,
                                 modifier = Modifier.fillMaxSize(),
                                 onBack = { selectedDevice = null },
-                                onDownload = { openLink(context, it) }
+                                onDownload = { openLink(context, it) },
+                                onSaveModule = saveModule
                             )
                         } else {
                             DevicesScreen(
@@ -928,7 +999,7 @@ private fun AboutScreen(modifier: Modifier, arabic: Boolean, onWebsite: () -> Un
 }
 
 @Composable
-private fun DeviceDetails(device: Device, arabic: Boolean, modifier: Modifier, onBack: () -> Unit, onDownload: (String?) -> Unit) {
+private fun DeviceDetails(device: Device, arabic: Boolean, modifier: Modifier, onBack: () -> Unit, onDownload: (String?) -> Unit, onSaveModule: (DeviceModule) -> Unit) {
     LazyColumn(modifier, contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 8.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
             TextButton(onClick = onBack, contentPadding = PaddingValues(horizontal = 0.dp)) {
@@ -987,14 +1058,14 @@ private fun DeviceDetails(device: Device, arabic: Boolean, modifier: Modifier, o
         }
         if (device.modules.isNotEmpty()) {
             item { SectionHeading(if (arabic) "الموديولات" else "Device modules", if (arabic) "موديولات مخصصة لهذا الجهاز" else "Modules listed for this device") }
-            items(device.modules, key = { it.title + it.downloadUrl }) { module ->
+            items(device.modules, key = { it.title + it.assetPath }) { module ->
                 GlassPanel {
                     Text(module.title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                     module.version?.let { Text("Version $it", color = Blue, fontSize = 11.sp) }
                     module.description?.let { Text(it, color = Color(0xFF9AAABD), fontSize = 12.sp, lineHeight = 18.sp) }
-                    Button(onClick = { onDownload(module.downloadUrl) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = Blue, contentColor = Color(0xFF07111D))) {
+                    Button(onClick = { onSaveModule(module) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = Blue, contentColor = Color(0xFF07111D))) {
                         Icon(Icons.Default.Download, contentDescription = null); Spacer(Modifier.width(8.dp))
-                        Text(if (arabic) "تحميل الموديول" else "Download module", fontWeight = FontWeight.Bold)
+                        Text(if (arabic) "حفظ في Downloads" else "Save to Downloads", fontWeight = FontWeight.Bold)
                     }
                 }
             }

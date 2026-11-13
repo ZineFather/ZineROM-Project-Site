@@ -120,7 +120,7 @@
         {
           "title": "A52s Camera Fix",
           "description": "Camera compatibility fix module for Galaxy A52s 5G. Verify compatibility with your exact ROM build before installing.",
-          "download_url": "https://gofile.io/d/DITlI845"
+          "asset_path": "modules/CameraFixForA52s.zip"
         }
       ]
     },
