@@ -91,8 +91,8 @@ data class Device(
 data class Release(val title: String, val version: String, val deviceId: String, val downloadUrl: String?)
 
 private val Blue = Color(0xFF85BDFF)
-private val Background = Color(0xFF08111F)
-private val SurfaceDark = Color(0xFF14243A)
+private val Background = Color(0xFF000000)
+private val SurfaceDark = Color(0xFF101010)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -153,22 +153,62 @@ private fun compareVersions(left: String, right: String): Int? {
 private fun versionIsNewer(remote: String, current: String): Boolean =
     (compareVersions(remote, current) ?: 0) > 0
 
-private data class RomBuildInfo(val buildNumber: String, val version: String)
+private data class RomBuildInfo(val buildNumber: String, val version: String, val source: String)
 
 private fun readRomBuildInfo(): RomBuildInfo? {
-    // Build.DISPLAY is the Android Build number shown in Settings.
-    val buildNumber = Build.DISPLAY.trim().ifEmpty {
-        Build.VERSION.INCREMENTAL.trim()
+    val properties = linkedMapOf<String, String>()
+    properties["Build.DISPLAY"] = Build.DISPLAY.orEmpty().trim()
+    properties["Build.VERSION.INCREMENTAL"] = Build.VERSION.INCREMENTAL.orEmpty().trim()
+    properties["Build.FINGERPRINT"] = Build.FINGERPRINT.orEmpty().trim()
+    val wantedKeys = setOf("ro.zinerom.version", "ro.build.display.id", "ro.build.version.incremental",
+        "ro.build.description", "ro.build.fingerprint")
+    listOf("/system/build.prop", "/system/system/build.prop", "/vendor/build.prop",
+        "/product/build.prop", "/odm/build.prop").forEach { path ->
+        runCatching {
+            val file = java.io.File(path)
+            if (file.isFile && file.canRead()) file.forEachLine { line ->
+                val split = line.indexOf('=')
+                if (split > 0) {
+                    val key = line.substring(0, split).trim()
+                    if (key in wantedKeys) properties[key] = line.substring(split + 1).trim().trim('"')
+                }
+            }
+        }
     }
-    if (buildNumber.isEmpty()) return null
+    val explicitPattern = Regex("""(?i)zinerom(?:[\s_-]+(?:one[\s_-]*ui[\s_-]*)?)?[\s:_-]*v?(\d+(?:\.\d+){1,3})""")
+    properties.forEach { (key, value) ->
+        val explicit = explicitPattern.find(value)?.groupValues?.getOrNull(1)
+            ?: if (key == "ro.zinerom.version" && value.matches(Regex("""(?i)v?\d+(?:\.\d+){1,3}""")))
+                value.removePrefix("v").removePrefix("V") else null
+        if (!explicit.isNullOrBlank() && parseVersionParts(explicit) != null) {
+            val display = properties["Build.DISPLAY"].orEmpty()
+                .ifBlank { properties["ro.build.display.id"].orEmpty() }.ifBlank { value }
+            return RomBuildInfo(display, explicit, key)
+        }
+    }
+    listOf("Build.DISPLAY", "Build.VERSION.INCREMENTAL", "ro.build.display.id", "ro.zinerom.version")
+        .forEach { key ->
+            val value = properties[key].orEmpty().trim()
+            if (value.matches(Regex("""(?i)v?\d+\.\d+\.\d+(?:\.\d+)?"""))) {
+                return RomBuildInfo(properties["Build.DISPLAY"].orEmpty().ifBlank { value },
+                    value.removePrefix("v").removePrefix("V"), key)
+            }
+        }
+    return null
+}
 
-    // Only a semantic version in the ROM Build number is accepted.
-    // Stock/non-ZineROM builds without this value must never be marked up to date.
-    val version = Regex("""(?<!\d)(\d+\.\d+\.\d+(?:\.\d+)?)(?!\d)""")
-        .find(buildNumber)?.groupValues?.getOrNull(1)
-        ?: return null
-
-    return RomBuildInfo(buildNumber, version)
+private fun fetchLatestRomVersion(updateJsonUrl: String): String {
+    val request = Request.Builder().url(updateJsonUrl)
+        .header("Cache-Control", "no-cache, no-store").header("Pragma", "no-cache").build()
+    val json = httpClient.newCall(request).execute().use { response ->
+        if (!response.isSuccessful) throw IllegalStateException("Update server HTTP " + response.code)
+        JSONObject(response.body?.string().orEmpty())
+    }
+    val latest = json.optString("latest_rom_version",
+        json.optString("rom_version", json.optString("version", "3.2.5")))
+        .trim().removePrefix("v").removePrefix("V")
+    if (parseVersionParts(latest) == null) throw IllegalStateException("Invalid latest_rom_version in update feed")
+    return latest
 }
 
 private fun readStringSet(json: JSONObject, vararg keys: String): Set<String> {
@@ -286,6 +326,8 @@ fun ZineApp() {
     var checking by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Ready") }
     var latestVersion by remember { mutableStateOf("") }
+    var installedRomVersion by remember { mutableStateOf("") }
+    var installedBuildNumber by remember { mutableStateOf("") }
     var releases by remember { mutableStateOf(emptyList<Release>()) }
     var startupNotice by remember { mutableStateOf<StartupNotice?>(null) }
 
@@ -328,7 +370,7 @@ fun ZineApp() {
                 startupNotice = StartupNotice(
                     title = if (arabic) "تحديث ZineROM متاح" else "ZineROM update available",
                     message = if (arabic)
-                        "إصدار الروم ${romBuild.version} أقدم من 3.2.5. افتح الموقع للبحث عن أحدث إصدار وتحميله."
+                        "الإصدار المثبت ${romBuild.version}، وأحدث إصدار ${remoteVersion}. افتح الموقع للحصول على التحديث."
                     else
                         "Your ROM build ${romBuild.version} is older than 3.2.5. Open the website to find and download the latest build.",
                     url = loadedConfig?.websiteUrl?.takeIf { it.startsWith("https://") } ?: DEFAULT_WEBSITE,
@@ -340,7 +382,7 @@ fun ZineApp() {
 
     MaterialTheme(colorScheme = darkColorScheme(
         primary = Blue, secondary = Color(0xFF8CE6F0),
-        background = Color(0xFF070B12), surface = Color(0xFF101927)
+        background = Color(0xFF000000), surface = Color(0xFF0B0B0B)
     )) {
         CompositionLocalProvider(LocalLayoutDirection provides if (arabic) LayoutDirection.Rtl else LayoutDirection.Ltr) {
             startupNotice?.let { notice ->
@@ -371,7 +413,7 @@ fun ZineApp() {
                 )
             }
             Scaffold(
-                containerColor = Color(0xFF070B12),
+                containerColor = Color(0xFF000000),
                 topBar = {
                     TopAppBar(
                         title = {
@@ -393,7 +435,7 @@ fun ZineApp() {
                                 Text(if (arabic) "EN" else "عربي", color = Blue, fontWeight = FontWeight.Bold)
                             }
                         },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF070B12))
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF000000))
                     )
                 },
                 bottomBar = {
@@ -445,19 +487,20 @@ fun ZineApp() {
                     composable("updates") {
                         UpdatesScreen(
                             Modifier.fillMaxSize(), arabic, checking, status,
-                            latestVersion, releases,
+                            installedRomVersion, installedBuildNumber, latestVersion, releases,
                             onCheck = {
                                 checking = true
                                 status = if (arabic) "جارٍ التحقق..." else "Checking for updates..."
                                 scope.launch {
                                     try {
                                         val source = config ?: readConfig(context)
-                                        val romBuild = withContext(Dispatchers.IO) {
-                                            runCatching { readRomBuildInfo() }.getOrNull()
-                                        }
-                                        latestVersion = romBuild?.version.orEmpty()
+                                        val romBuild = withContext(Dispatchers.IO) { readRomBuildInfo() }
+                                        installedRomVersion = romBuild?.version.orEmpty()
+                                        installedBuildNumber = romBuild?.buildNumber.orEmpty()
+                                        val remoteVersion = withContext(Dispatchers.IO) { fetchLatestRomVersion(source.updateJsonUrl) }
+                                        latestVersion = remoteVersion
                                         val hasUpdate = romBuild != null &&
-                                            (compareVersions(romBuild.version, MIN_REQUIRED_APP_VERSION) ?: 0) < 0
+                                            (compareVersions(romBuild.version, remoteVersion) ?: -1) < 0
 
                                         releases = try {
                                             withContext(Dispatchers.IO) {
@@ -498,14 +541,14 @@ fun ZineApp() {
                                                     message = if (arabic)
                                                         "إصدار الروم ${romBuild.version} أقدم من 3.2.5. افتح الموقع للبحث عن أحدث إصدار وتحميله."
                                                     else
-                                                        "ROM build ${romBuild.version} is older than 3.2.5. Open the website to find and download the latest build.",
+                                                        "Installed ROM: ${romBuild.version}. Latest ROM: ${remoteVersion}. Open the website to get the update.",
                                                     url = source.websiteUrl.ifBlank { DEFAULT_WEBSITE },
                                                     action = if (arabic) "فتح الموقع" else "Open website"
                                                 )
                                                 if (arabic) "يتوفر تحديث جديد: $latestVersion" else "Update available: $latestVersion"
                                             }
                                             else ->
-                                                if (arabic) "أنت على أحدث إصدار: $latestVersion" else "You're up to date: $latestVersion"
+                                                if (arabic) "الروم محدثة: ${romBuild?.version} (أحدث إصدار ${remoteVersion})" else "ROM is up to date: ${romBuild?.version} (latest: ${remoteVersion})"
                                         }
                                     } catch (error: Exception) {
                                         status = (if (arabic) "فشل التحقق: " else "Check failed: ") +
@@ -554,7 +597,7 @@ private fun ZineBottomBar(
     Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Row(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp))
-                .background(Brush.linearGradient(listOf(Color(0xF0203045), Color(0xF0101928))))
+                .background(Brush.linearGradient(listOf(Color(0xFF111111), Color(0xFF080808))))
                 .border(1.dp, Color.White.copy(alpha = .12f), RoundedCornerShape(26.dp))
                 .padding(6.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -687,7 +730,7 @@ private fun HomeScreen(
         item {
             Column(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(27.dp))
-                    .background(Brush.linearGradient(listOf(Color(0xFF1A3552), Color(0xFF101C2B), Color(0xFF172A3B))))
+                    .background(Brush.linearGradient(listOf(Color(0xFF101010), Color(0xFF080808), Color(0xFF0D0D0D))))
                     .border(1.dp, Blue.copy(alpha = .25f), RoundedCornerShape(27.dp)).padding(18.dp),
                 verticalArrangement = Arrangement.spacedBy(13.dp)
             ) {
@@ -748,7 +791,7 @@ private fun DevicesScreen(devices: List<Device>, arabic: Boolean, modifier: Modi
             Text(if (arabic) "ابحث عن جهازك وافتح تفاصيل الروم." else "Find your device and explore its ROM details.", color = Color(0xFF9AAABD), fontSize = 12.sp)
             Spacer(Modifier.height(12.dp))
             Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF101927))
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF0B0B0B))
                     .border(1.dp, Color.White.copy(alpha = .09f), RoundedCornerShape(16.dp)).padding(horizontal = 14.dp, vertical = 13.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -774,12 +817,12 @@ private fun DevicesScreen(devices: List<Device>, arabic: Boolean, modifier: Modi
 private fun DeviceCard(device: Device, arabic: Boolean, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp))
-            .background(Brush.linearGradient(listOf(Color(0xFF17263A), Color(0xFF101927))))
+            .background(Brush.linearGradient(listOf(Color(0xFF111111), Color(0xFF0B0B0B))))
             .border(1.dp, Color.White.copy(alpha = .08f), RoundedCornerShape(22.dp))
             .clickable(onClick = onClick).padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(Modifier.size(94.dp, 104.dp).clip(RoundedCornerShape(17.dp)).background(Color(0xFF1C3047)), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(94.dp, 104.dp).clip(RoundedCornerShape(17.dp)).background(Color(0xFF171717)), contentAlignment = Alignment.Center) {
             AsyncImage(device.imageUrl, device.name, Modifier.fillMaxSize().padding(5.dp), contentScale = ContentScale.Fit)
         }
         Spacer(Modifier.width(13.dp))
@@ -798,7 +841,7 @@ private fun DeviceCard(device: Device, arabic: Boolean, onClick: () -> Unit) {
 @Composable
 private fun UpdatesScreen(
     modifier: Modifier, arabic: Boolean, checking: Boolean, status: String,
-    latestVersion: String, releases: List<Release>, onCheck: () -> Unit,
+    installedRomVersion: String, installedBuildNumber: String, latestVersion: String, releases: List<Release>, onCheck: () -> Unit,
     onChangelog: () -> Unit, onDownload: (String?) -> Unit
 ) {
     LazyColumn(modifier, contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -808,8 +851,10 @@ private fun UpdatesScreen(
         }
         item {
             GlassPanel {
-                Text(if (arabic) "إصدار التطبيق الحالي" else "CURRENT APP VERSION", color = Color(0xFF9AAABD), fontSize = 9.sp, letterSpacing = 1.5.sp)
-                Text(CURRENT_APP_VERSION, color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+                Text(if (arabic) "إصدار الروم المثبت" else "INSTALLED ROM VERSION", color = Color(0xFF9AAABD), fontSize = 9.sp, letterSpacing = 1.5.sp)
+                Text(installedRomVersion.ifBlank { if (arabic) "غير معروف" else "Not detected" }, color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+                if (installedBuildNumber.isNotBlank()) Text("Build Number: $installedBuildNumber", color = Color(0xFF8D8D8D), fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (latestVersion.isNotBlank()) Text((if (arabic) "أحدث إصدار للروم: " else "Latest ROM version: ") + latestVersion, color = Blue, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 Button(onClick = onCheck, enabled = !checking, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(15.dp), colors = ButtonDefaults.buttonColors(containerColor = Blue, contentColor = Color(0xFF07111D))) {
                     Icon(if (checking) Icons.Default.Sync else Icons.Default.SystemUpdate, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
@@ -875,7 +920,7 @@ private fun DeviceDetails(device: Device, arabic: Boolean, modifier: Modifier, o
                 Text(if (arabic) "رجوع للأجهزة" else "Back to devices")
             }
             Box(Modifier.fillMaxWidth().height(235.dp).clip(RoundedCornerShape(27.dp))
-                .background(Brush.linearGradient(listOf(Color(0xFF1A3048), Color(0xFF0F1927))))
+                .background(Brush.linearGradient(listOf(Color(0xFF141414), Color(0xFF080808))))
                 .border(1.dp, Color.White.copy(alpha = .08f), RoundedCornerShape(27.dp)), contentAlignment = Alignment.Center) {
                 AsyncImage(device.imageUrl, device.name, Modifier.fillMaxSize().padding(12.dp), contentScale = ContentScale.Fit)
             }
@@ -939,7 +984,7 @@ private fun SectionHeading(title: String, subtitle: String) {
 private fun GlassPanel(content: @Composable ColumnScope.() -> Unit) {
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp))
-            .background(Brush.linearGradient(listOf(Color(0xE51B2A3D), Color(0xE5101927))))
+            .background(Brush.linearGradient(listOf(Color(0xFF101010), Color(0xFF080808))))
             .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(alpha = .16f), Blue.copy(alpha = .13f), Color.White.copy(alpha = .05f))), RoundedCornerShape(22.dp))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp), content = content
