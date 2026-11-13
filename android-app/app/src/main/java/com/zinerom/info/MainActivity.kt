@@ -623,7 +623,11 @@ fun ZineApp() {
                                 arabic = arabic,
                                 modifier = Modifier.fillMaxSize(),
                                 onBack = { selectedDevice = null },
-                                onDownload = { openLink(context, it) },
+                                onDownload = {
+                                    val site = config?.websiteUrl?.takeIf { url -> url.startsWith("https://") }
+                                        ?: DEFAULT_WEBSITE
+                                    openLink(context, devicePageUrl(site, selectedDevice!!.id))
+                                },
                                 onSaveModule = saveModule
                             )
                         } else {
