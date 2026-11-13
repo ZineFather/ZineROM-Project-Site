@@ -12,10 +12,12 @@ import android.provider.MediaStore
 import android.widget.Toast
 import java.io.File
 import android.net.Uri
+import android.graphics.BitmapFactory
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -40,6 +42,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -53,7 +56,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.work.*
-import coil.compose.AsyncImage
 import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.Dispatchers
@@ -96,7 +98,7 @@ data class Rom(val title: String, val version: String, val downloadUrl: String)
 data class DeviceModule(val title: String, val description: String?, val version: String?, val assetPath: String)
 data class Device(
     val id: String, val name: String, val model: String?, val versions: List<String>,
-    val imageUrl: String?, val description: String?, val downloadUrl: String?, val roms: List<Rom>,
+    val imageAssetPath: String?, val description: String?, val downloadUrl: String?, val roms: List<Rom>,
     val modules: List<DeviceModule>
 )
 data class Release(val title: String, val version: String, val deviceId: String, val downloadUrl: String?)
@@ -360,7 +362,7 @@ private fun readDevices(context: Context): List<Device> {
             name = item.getString("name"),
             model = item.optString("model").takeIf { it.isNotBlank() && it != "null" },
             versions = if (versions == null) emptyList() else (0 until versions.length()).map { versions.getString(it) },
-            imageUrl = item.optString("image_url").takeIf { it.startsWith("https://") },
+            imageAssetPath = item.optString("image_asset").takeIf { it.startsWith("device-images/") && !it.contains("..") },
             description = item.optString("description"),
             downloadUrl = item.optString("download_url").takeIf { it.startsWith("https://") },
             roms = roms,
@@ -420,12 +422,13 @@ fun ZineApp() {
 
     val tabs = listOf(
         MainTab("home", "Home", "الرئيسية", Icons.Default.Home),
-        MainTab("devices", "Devices", "الأجهزة", Icons.Default.PhoneAndroid),
-        MainTab("updates", "Updates", "التحديثات", Icons.Default.SystemUpdate),
+        MainTab("superuser", "Superuser", "سوبر يوزر", Icons.Default.AdminPanelSettings),
+        MainTab("modules", "Modules", "الموديولات", Icons.Default.Extension),
         MainTab("settings", "Settings", "الإعدادات", Icons.Default.Settings)
     )
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route ?: "home"
+    BackHandler(enabled = selectedDevice != null) { selectedDevice = null }
 
     LaunchedEffect(Unit) {
         val loadedConfig = withContext(Dispatchers.IO) {
@@ -504,16 +507,23 @@ fun ZineApp() {
                 topBar = {
                     TopAppBar(
                         title = {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
                                 Box(
-                                    Modifier.size(36.dp).clip(RoundedCornerShape(12.dp))
-                                        .background(Brush.linearGradient(listOf(Blue.copy(alpha = .28f), Color(0xFF8CE6F0).copy(alpha = .10f))))
-                                        .border(1.dp, Blue.copy(alpha = .35f), RoundedCornerShape(12.dp)),
+                                    Modifier.size(42.dp).clip(RoundedCornerShape(15.dp))
+                                        .background(Brush.radialGradient(listOf(Color(0xFF4AA8FF).copy(alpha = .42f), Color(0xFF142C4B), Color(0xFF080D16))))
+                                        .border(1.dp, Blue.copy(alpha = .55f), RoundedCornerShape(15.dp)),
                                     contentAlignment = Alignment.Center
-                                ) { Image(painter = painterResource(R.drawable.zine_app_icon), contentDescription = "ZineROM logo", modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop) }
-                                Column {
-                                    Text("ZineROM", fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                                    Text("PROJECT COMPANION", color = Color(0xFF9AAABD), fontSize = 8.sp, letterSpacing = 1.5.sp)
+                                ) {
+                                    Image(
+                                        painter = painterResource(R.drawable.zine_app_icon),
+                                        contentDescription = "ZineROM Z logo",
+                                        modifier = Modifier.size(36.dp).clip(RoundedCornerShape(11.dp)),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                }
+                                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                                    Text("ZineROM Project", fontWeight = FontWeight.Bold, fontSize = 16.sp, letterSpacing = .1.sp)
+                                    Text("OFFICIAL APP  •  BUILDS & UPDATES", color = Color(0xFF8FAAC8), fontSize = 7.sp, letterSpacing = 1.05.sp)
                                 }
                             }
                         },
@@ -553,6 +563,18 @@ fun ZineApp() {
                             onBrowse = { selectedDevice = null; navController.navigate("devices") },
                             onUpdates = { navController.navigate("updates") },
                             onDevice = { selectedDevice = it; navController.navigate("devices") }
+                        )
+                    }
+                    composable("superuser") {
+                        SuperuserScreen(arabic = arabic, modifier = Modifier.fillMaxSize())
+                    }
+                    composable("modules") {
+                        ModulesScreen(
+                            devices = devices,
+                            arabic = arabic,
+                            modifier = Modifier.fillMaxSize(),
+                            onSaveModule = saveModule,
+                            onOpenDevice = { device -> selectedDevice = device; navController.navigate("devices") }
                         )
                     }
                     composable("devices") {
@@ -683,43 +705,42 @@ private fun ZineBottomBar(
     onSelect: (String) -> Unit
 ) {
     Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Box(
+            Modifier.align(Alignment.Center).fillMaxWidth(.82f).height(34.dp)
+                .clip(RoundedCornerShape(50)).background(Blue.copy(alpha = .13f)).blur(22.dp)
+        )
         Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp))
-                .background(Brush.linearGradient(listOf(Color(0xFF111111), Color(0xFF080808))))
-                .border(1.dp, Color.White.copy(alpha = .12f), RoundedCornerShape(26.dp))
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp))
+                .background(Brush.linearGradient(listOf(Color(0xE6222F40), Color(0xE60C121D), Color(0xE6182432))))
+                .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(alpha = .25f), Blue.copy(alpha = .24f), Color.White.copy(alpha = .08f))), RoundedCornerShape(28.dp))
                 .padding(6.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             tabs.forEach { tab ->
                 val active = selectedRoute == tab.route
+                val activeColor by androidx.compose.animation.animateColorAsState(
+                    targetValue = if (active) Blue.copy(alpha = .20f) else Color.Transparent,
+                    label = "tab-glass"
+                )
+                val iconColor by androidx.compose.animation.animateColorAsState(
+                    targetValue = if (active) Blue else Color(0xFF91A2B8),
+                    label = "tab-icon"
+                )
                 Column(
-                    Modifier.weight(1f).clip(RoundedCornerShape(20.dp))
-                        .background(if (active) Blue.copy(alpha = .16f) else Color.Transparent)
+                    Modifier.weight(1f).clip(RoundedCornerShape(22.dp))
+                        .background(activeColor)
                         .clickable { onSelect(tab.route) }
-                        .padding(vertical = 8.dp),
+                        .padding(vertical = 9.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        if (active) Box(
-                            Modifier.size(width = 24.dp, height = 3.dp).align(Alignment.TopCenter)
-                                .offset(y = (-7).dp).clip(RoundedCornerShape(3.dp)).background(Blue)
-                        )
-                        Icon(
-                            tab.icon,
-                            contentDescription = if (arabic) tab.arabicLabel else tab.label,
-                            tint = if (active) Blue else Color(0xFF91A2B8),
-                            modifier = Modifier.size(21.dp)
-                        )
-                    }
-                    Text(
-                        if (arabic) tab.arabicLabel else tab.label,
+                    Icon(tab.icon, contentDescription = if (arabic) tab.arabicLabel else tab.label,
+                        tint = iconColor, modifier = Modifier.size(21.dp))
+                    Text(if (arabic) tab.arabicLabel else tab.label,
                         color = if (active) Color.White else Color(0xFF91A2B8),
-                        fontSize = 9.sp,
-                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-                        maxLines = 1
-                    )
+                        fontSize = 9.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                        maxLines = 1)
                 }
             }
         }
@@ -911,7 +932,7 @@ private fun DeviceCard(device: Device, arabic: Boolean, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(Modifier.size(94.dp, 104.dp).clip(RoundedCornerShape(17.dp)).background(Color(0xFF171717)), contentAlignment = Alignment.Center) {
-            AsyncImage(device.imageUrl, device.name, Modifier.fillMaxSize().padding(5.dp), contentScale = ContentScale.Fit)
+            DeviceAssetImage(device.imageAssetPath, device.name, Modifier.fillMaxSize().padding(5.dp), contentScale = ContentScale.Fit)
         }
         Spacer(Modifier.width(13.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -1009,7 +1030,7 @@ private fun DeviceDetails(device: Device, arabic: Boolean, modifier: Modifier, o
             Box(Modifier.fillMaxWidth().height(235.dp).clip(RoundedCornerShape(27.dp))
                 .background(Brush.linearGradient(listOf(Color(0xFF141414), Color(0xFF080808))))
                 .border(1.dp, Color.White.copy(alpha = .08f), RoundedCornerShape(27.dp)), contentAlignment = Alignment.Center) {
-                AsyncImage(device.imageUrl, device.name, Modifier.fillMaxSize().padding(12.dp), contentScale = ContentScale.Fit)
+                DeviceAssetImage(device.imageAssetPath, device.name, Modifier.fillMaxSize().padding(12.dp), contentScale = ContentScale.Fit)
             }
             Spacer(Modifier.height(10.dp))
             Text(device.name, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
@@ -1082,6 +1103,135 @@ private fun SectionHeading(title: String, subtitle: String) {
 }
 
 @Composable
+
+@Composable
+private fun DeviceAssetImage(
+    assetPath: String?,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Fit
+) {
+    val context = LocalContext.current
+    val bitmap by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, assetPath) {
+        value = withContext(Dispatchers.IO) {
+            if (assetPath.isNullOrBlank()) null
+            else runCatching {
+                context.assets.open(assetPath).use { stream ->
+                    BitmapFactory.decodeStream(stream)?.asImageBitmap()
+                }
+            }.getOrNull()
+        }
+    }
+    if (bitmap != null) {
+        Image(bitmap = bitmap!!, contentDescription = contentDescription, modifier = modifier, contentScale = contentScale)
+    } else {
+        Box(modifier.background(Color(0xFF171717)), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.PhoneAndroid, contentDescription = null, tint = Color(0xFF6D829A), modifier = Modifier.size(34.dp))
+        }
+    }
+}
+
+@Composable
+private fun SuperuserScreen(arabic: Boolean, modifier: Modifier = Modifier) {
+    val paths = remember { listOf("/system/bin/su", "/system/xbin/su", "/sbin/su", "/debug_ramdisk/su", "/vendor/bin/su") }
+    val detected = remember { paths.any { File(it).exists() } }
+    LazyColumn(modifier, contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        item {
+            Text(if (arabic) "Superuser" else "Superuser", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+            Text(if (arabic) "معلومات حالة صلاحيات الروت على الجهاز." else "A local, read-only overview of root availability.", color = Color(0xFF9AAABD), fontSize = 12.sp)
+        }
+        item {
+            GlassPanel {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Icon(Icons.Default.AdminPanelSettings, contentDescription = null, tint = Blue, modifier = Modifier.size(28.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(if (detected) (if (arabic) "تم العثور على ملف su" else "su binary detected") else (if (arabic) "لم يتم العثور على ملف su" else "No su binary detected"),
+                            color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(if (arabic) "فحص محلي فقط — لا يتم طلب صلاحيات أو تنفيذ أوامر." else "Read-only check. The app does not request root or execute commands.",
+                            color = Color(0xFF9AAABD), fontSize = 11.sp, lineHeight = 17.sp)
+                    }
+                    Icon(if (detected) Icons.Default.CheckCircle else Icons.Default.Info, contentDescription = null,
+                        tint = if (detected) Color(0xFF75D6A0) else Color(0xFFFFC477))
+                }
+            }
+        }
+        item {
+            GlassPanel {
+                Text(if (arabic) "ملاحظة" else "NOTE", color = Blue, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text(if (arabic) "وجود ملف su لا يثبت أن تطبيقات الروت لديها صلاحية Superuser. راجع مدير Magisk أو KernelSU لمنح الصلاحيات يدويًا." else "Finding an su file does not prove that apps have Superuser permission. Manage app grants directly in Magisk or KernelSU.",
+                    color = Color(0xFF9AAABD), fontSize = 12.sp, lineHeight = 19.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModulesScreen(
+    devices: List<Device>,
+    arabic: Boolean,
+    modifier: Modifier = Modifier,
+    onSaveModule: (DeviceModule) -> Unit,
+    onOpenDevice: (Device) -> Unit
+) {
+    var query by remember { mutableStateOf("") }
+    val allModules = remember(devices) { devices.flatMap { device -> device.modules.map { device to it } } }
+    val filtered = remember(allModules, query) {
+        allModules.filter { (device, module) ->
+            device.name.contains(query, true) || (device.model?.contains(query, true) == true) ||
+                module.title.contains(query, true) || (module.description?.contains(query, true) == true)
+        }
+    }
+    LazyColumn(modifier, contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
+        item {
+            Text(if (arabic) "الموديولات" else "Modules", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+            Text(if (arabic) "كل الموديولات المتاحة لأجهزة ZineROM." else "Browse modules available for supported ZineROM devices.", color = Color(0xFF9AAABD), fontSize = 12.sp)
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFF101722)).border(1.dp, Color.White.copy(alpha = .10f), RoundedCornerShape(16.dp))
+                .padding(horizontal = 14.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF91A2B8))
+                Spacer(Modifier.width(10.dp))
+                BasicTextField(value = query, onValueChange = { query = it }, modifier = Modifier.weight(1f),
+                    singleLine = true, textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.White),
+                    decorationBox = { inner ->
+                        if (query.isEmpty()) Text(if (arabic) "ابحث باسم الموديول أو الجهاز" else "Search modules or devices", color = Color(0xFF91A2B8), fontSize = 13.sp)
+                        inner()
+                    })
+                if (query.isNotEmpty()) Icon(Icons.Default.Close, contentDescription = if (arabic) "مسح" else "Clear",
+                    tint = Blue, modifier = Modifier.clickable { query = "" }.size(20.dp))
+            }
+            Text("${filtered.size} " + if (arabic) "موديول" else if (filtered.size == 1) "module" else "modules",
+                color = Blue, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
+        }
+        items(filtered, key = { it.first.id + it.second.assetPath }, contentType = { "module" }) { (device, module) ->
+            GlassPanel {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Extension, contentDescription = null, tint = Blue, modifier = Modifier.size(25.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(module.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text(device.name + "  •  " + (device.model ?: device.id), color = Color(0xFF8FAAC8), fontSize = 10.sp)
+                    }
+                }
+                module.description?.let { Text(it, color = Color(0xFF9AAABD), fontSize = 12.sp, lineHeight = 18.sp) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { onSaveModule(module) }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Blue, contentColor = Color(0xFF07111D))) {
+                        Icon(Icons.Default.Download, contentDescription = null); Spacer(Modifier.width(6.dp))
+                        Text(if (arabic) "حفظ" else "Save")
+                    }
+                    OutlinedButton(onClick = { onOpenDevice(device) }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp)) {
+                        Text(if (arabic) "الجهاز" else "Device", color = Color.White)
+                    }
+                }
+            }
+        }
+        if (filtered.isEmpty()) item {
+            GlassPanel { Text(if (arabic) "لا توجد موديولات مطابقة." else "No matching modules yet.", color = Color(0xFF9AAABD), fontSize = 13.sp) }
+        }
+    }
+}
+
 private fun GlassPanel(content: @Composable ColumnScope.() -> Unit) {
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp))
