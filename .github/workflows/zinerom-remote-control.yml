@@ -172,7 +172,7 @@ jobs:
       - name: Send FCM notification
         if: inputs.notification_type != 'NONE'
         env:
-          FCM_SERVICE_ACCOUNT_JSON: ${{ secrets.FCM_SERVICE_ACCOUNT_JSON }}
+          FCM_SERVICE_ACCOUNT_JSON: ${{ (secrets.FCM_SERVICE_ACCOUNT_JSON || secrets.FIREBASE_SERVICE_ACCOUNT) }}
           TARGET_DEVICE: ${{ inputs.target_device }}
           NOTIFICATION_TYPE: ${{ inputs.notification_type }}
           NOTIFICATION_TITLE: ${{ inputs.notification_title }}
@@ -183,7 +183,7 @@ jobs:
           BUTTON_URL: ${{ inputs.button_url }}
         run: |
           set -euo pipefail
-          test -n "$FCM_SERVICE_ACCOUNT_JSON" || { echo "::error::Add FCM_SERVICE_ACCOUNT_JSON to repository Actions secrets. No notification was sent."; exit 1; }
+          test -n "$FCM_SERVICE_ACCOUNT_JSON" || { echo "::error::Add FCM_SERVICE_ACCOUNT_JSON or FIREBASE_SERVICE_ACCOUNT to repository Actions secrets. No notification was sent."; exit 1; }
           npm install --no-save google-auth-library
           node <<'NODE'
           const {GoogleAuth} = require('google-auth-library');
