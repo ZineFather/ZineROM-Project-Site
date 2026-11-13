@@ -183,7 +183,17 @@ class UpdateWorker(context: Context, params: WorkerParameters) : CoroutineWorker
     override suspend fun doWork(): Result = try {
         val config = readConfig(applicationContext)
         val request = Request.Builder().url(config.releasesUrl).build()
-        val latest = http@OptIn(ExperimentalMaterial3Api::class)
+        val latest = httpClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw IllegalStateException("HTTP " + response.code)
+            JSONObject(response.body?.string().orEmpty()).optString("latest_app_version", BuildConfig.VERSION_NAME)
+        }
+        if (versionIsNewer(latest, BuildConfig.VERSION_NAME)) notifyUpdate(applicationContext, latest)
+        Result.success()
+    } catch (_: Exception) { Result.retry() }
+}
+
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ZineApp() {
     val context = LocalContext.current
