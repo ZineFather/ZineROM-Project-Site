@@ -3,11 +3,6 @@ name: ZineROM Send Notification
 on:
   workflow_dispatch:
     inputs:
-      title:
-        description: "Notification title"
-        required: true
-        type: string
-        default: "ZineROM — New Update"
       message:
         description: "Notification message"
         required: true
@@ -19,7 +14,12 @@ on:
         type: choice
         options:
           - UPDATE
+          - WARNING
+          - TEST
+          - DEVELOPER_ANALYSIS
           - ANNOUNCEMENT
+          - IMPORTANT
+          - BUG_REPORT
           - MAINTENANCE
       version:
         description: "Version label (optional)"
@@ -81,7 +81,6 @@ jobs:
       - name: Send FCM topic notification
         env:
           ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
-          TITLE: ${{ inputs.title }}
           MESSAGE: ${{ inputs.message }}
           NOTICE_TYPE: ${{ inputs.type }}
           TARGET_VERSION: ${{ inputs.version }}
@@ -111,7 +110,69 @@ jobs:
             *) echo "::error::button_url must start with https://"; exit 1 ;;
           esac
 
+          case "$NOTICE_TYPE" in
+            UPDATE) TITLE="ZineROM • New Update" ;;
+            WARNING) TITLE="ZineROM • Warning" ;;
+            TEST) TITLE="ZineROM • Test Notification" ;;
+            DEVELOPER_ANALYSIS) TITLE="ZineROM • Developer Analysis" ;;
+            ANNOUNCEMENT) TITLE="ZineROM • Announcement" ;;
+            IMPORTANT) TITLE="ZineROM • Important Notice" ;;
+            BUG_REPORT) TITLE="ZineROM • Bug Report" ;;
+            MAINTENANCE) TITLE="ZineROM • Maintenance" ;;
+            *) echo "::error::Unsupported notification type: $NOTICE_TYPE"; exit 1 ;;
+          esac
+
           DISPLAY_MESSAGE="$MESSAGE"
+          if [ -n "$TARGET_VERSION" ]; then
+            DISPLAY_MESSAGE="$DISPLAY_MESSAGE"
+            DISPLAY_MESSAGE="$MESSAGE"$'\n\n'"Target device: $TARGET_LABEL"
+          fi
+
+          PAYLOAD=$(jq -n \
+            --arg topic "$TOPIC" \
+            --arg title "$TITLE" \
+            --arg message "$DISPLAY_MESSAGE" \
+            --arg target_device "$TARGET_LABEL" \
+            --arg type "$NOTICE_TYPE" \
+            --arg version "$TARGET_VERSION" \
+            --arg button_text "$BUTTON_TEXT" \
+            --arg button_url "$BUTTON_URL" \
+            '{
+              message: {
+                topic: $topic,
+                notification: { title: $title, body: $message },
+                data: {
+                  title: $title,
+                  message: $message,
+                  type: $type,
+                  target_version: $version,
+                  target_device: $target_device,
+                  button_text: $button_text,
+                  button_url: $button_url
+                },
+                android: {
+                  priority: "HIGH",
+                  notification: {
+                    channel_id: "zinerom_alerts_v2",
+                    sound: "default"
+                  }
+                }
+              }
+            }')
+
+          RESPONSE=$(curl --fail-with-body --silent --show-error \
+            -X POST "https://fcm.googleapis.com/v1/projects/$PROJECT_ID/messages:send" \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            -H "Content-Type: application/json; charset=UTF-8" \
+            -d "$PAYLOAD")
+
+          echo "$RESPONSE" | jq .
+          MESSAGE_NAME=$(echo "$RESPONSE" | jq -er '.name')
+          echo "Firebase accepted message: $MESSAGE_NAME"
+          echo "Topic: $TOPIC | Intended device: $TARGET_LABEL"
+          echo "Android background delivery uses the system notification payload; foreground delivery uses the app messaging service."
+\n\n'"Version: $TARGET_VERSION"
+          fi
           if [ "$TARGET" != "ALL" ]; then
             DISPLAY_MESSAGE="$MESSAGE"$'\n\n'"Target device: $TARGET_LABEL"
           fi
