@@ -153,17 +153,20 @@ private fun compareVersions(left: String, right: String): Int? {
 private fun versionIsNewer(remote: String, current: String): Boolean =
     (compareVersions(remote, current) ?: 0) > 0
 
-@Suppress("DEPRECATION")
-private fun readInstalledVersion(context: Context): String? {
-    val packageInfo = if (Build.VERSION.SDK_INT >= 33) {
-        context.packageManager.getPackageInfo(
-            context.packageName,
-            PackageManager.PackageInfoFlags.of(0)
-        )
-    } else {
-        context.packageManager.getPackageInfo(context.packageName, 0)
-    }
-    return packageInfo.versionName?.trim()?.takeIf { it.isNotEmpty() }
+private data class RomBuildInfo(val buildNumber: String, val version: String)
+
+private fun readRomBuildInfo(): RomBuildInfo? {
+    // Android Settings > About phone > Software information > Build number.
+    val candidates = listOf(Build.DISPLAY, Build.VERSION.INCREMENTAL, Build.ID)
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+
+    val zineBuild = candidates.firstOrNull { it.contains("ZineROM", ignoreCase = true) }
+        ?: return null
+    val version = Regex("""(?<!\d)(\d+\.\d+\.\d+(?:\.\d+)?)(?!\d)""")
+        .find(zineBuild)?.groupValues?.getOrNull(1)
+        ?: return null
+    return RomBuildInfo(zineBuild, version)
 }
 
 private fun readStringSet(json: JSONObject, vararg keys: String): Set<String> {
@@ -303,38 +306,31 @@ fun ZineApp() {
             runCatching { readDevices(context) }.getOrNull()?.let { devices = it }
         }
 
-        val installedVersion = withContext(Dispatchers.IO) {
-            runCatching { readInstalledVersion(context) }.getOrNull()
+        val romBuild = withContext(Dispatchers.IO) {
+            runCatching { readRomBuildInfo() }.getOrNull()
         }
 
         when {
-            installedVersion.isNullOrBlank() || compareVersions(installedVersion, MIN_REQUIRED_APP_VERSION) == null -> {
+            romBuild == null -> {
                 startupNotice = StartupNotice(
-                    title = if (arabic) "مشكلة في قراءة إصدار التطبيق" else "Build information issue",
+                    title = if (arabic) "ZineROM غير مكتشفة" else "ZineROM not detected",
                     message = if (arabic)
-                        "تعذر التعرف على رقم إصدار التطبيق. من فضلك أرسل تقريرًا للمطورين."
+                        "رقم Build Number لا يحتوي على إصدار ZineROM معروف. إما أن الجهاز لا يستخدم ZineROM أو توجد مشكلة في قراءة معلومات البناء. لو الروم مثبتة، أرسل تقرير خطأ."
                     else
-                        "The installed app version could not be detected. Please report this issue to the developers.",
+                        "The Build Number does not contain a recognizable ZineROM version. Either this device is not running ZineROM, or there is a build-information issue. If ZineROM is installed, please report a bug.",
                     url = BUG_REPORT_URL,
-                    action = if (arabic) "إرسال تقرير" else "Report issue"
+                    action = "Report bug"
                 )
             }
-            compareVersions(installedVersion, MIN_REQUIRED_APP_VERSION)!! < 0 -> {
-                val updateUrl = withContext(Dispatchers.IO) {
-                    runCatching {
-                        val source = loadedConfig ?: readConfig(context)
-                        fetchAppUpdate(source.updateJsonUrl).update?.downloadUrl
-                    }.getOrNull()
-                } ?: loadedConfig?.websiteUrl?.takeIf { it.startsWith("https://") } ?: DEFAULT_WEBSITE
-
+            (compareVersions(romBuild.version, MIN_REQUIRED_APP_VERSION) ?: -1) < 0 -> {
                 startupNotice = StartupNotice(
                     title = if (arabic) "تحديث ZineROM متاح" else "ZineROM update available",
                     message = if (arabic)
-                        "إصدار تطبيقك $installedVersion أقدم من الإصدار المطلوب $MIN_REQUIRED_APP_VERSION. حدّث التطبيق للحصول على أحدث الميزات والإصلاحات."
+                        "إصدار الروم ${romBuild.version} أقدم من 3.2.5. افتح الموقع للبحث عن أحدث إصدار وتحميله."
                     else
-                        "Your app version $installedVersion is older than the required version $MIN_REQUIRED_APP_VERSION. Update the app to get the latest features and fixes.",
-                    url = updateUrl,
-                    action = if (arabic) "تحميل التحديث" else "Get update"
+                        "Your ROM build ${romBuild.version} is older than 3.2.5. Open the website to find and download the latest build.",
+                    url = loadedConfig?.websiteUrl?.takeIf { it.startsWith("https://") } ?: DEFAULT_WEBSITE,
+                    action = if (arabic) "فتح الموقع" else "Open website"
                 )
             }
         }
@@ -448,9 +444,12 @@ fun ZineApp() {
                                         val result = withContext(Dispatchers.IO) {
                                             fetchAppUpdate(source.updateJsonUrl)
                                         }
-                                        val update = result.update
-                                        latestVersion = update?.version?.takeIf { it.isNotBlank() } ?: CURRENT_APP_VERSION
-                                        val hasUpdate = update != null && versionIsNewer(update.version, CURRENT_APP_VERSION)
+                                        val romBuild = withContext(Dispatchers.IO) {
+                                            runCatching { readRomBuildInfo() }.getOrNull()
+                                        }
+                                        latestVersion = romBuild?.version.orEmpty()
+                                        val hasUpdate = romBuild != null &&
+                                            (compareVersions(romBuild.version, MIN_REQUIRED_APP_VERSION) ?: 0) < 0
 
                                         releases = try {
                                             withContext(Dispatchers.IO) {
@@ -473,14 +472,32 @@ fun ZineApp() {
                                         } catch (_: Exception) { emptyList() }
 
                                         status = when {
-                                            result.hasTargetRules && update == null ->
-                                                if (arabic) "لا يوجد تحديث مخصص لهذا الجهاز" else "No update targeted to this device"
-                                            hasUpdate ->
-                                                if (arabic) "يتوفر تحديث جديد: $latestVersion — افتح الموقع للتفاصيل"
-                                                else "Update available: $latestVersion — open the website for details"
+                                            romBuild == null -> {
+                                                startupNotice = StartupNotice(
+                                                    title = if (arabic) "ZineROM غير مكتشفة" else "ZineROM not detected",
+                                                    message = if (arabic)
+                                                        "إما أن الجهاز لا يستخدم ZineROM أو توجد مشكلة في قراءة Build Number. لو الروم مثبتة، أرسل تقرير خطأ."
+                                                    else
+                                                        "This device is not running ZineROM, or the Build Number could not be read. If ZineROM is installed, please report a bug.",
+                                                    url = BUG_REPORT_URL,
+                                                    action = "Report bug"
+                                                )
+                                                if (arabic) "ZineROM غير مكتشفة — راجع التنبيه" else "ZineROM not detected — see notice"
+                                            }
+                                            hasUpdate -> {
+                                                startupNotice = StartupNotice(
+                                                    title = if (arabic) "تحديث ZineROM متاح" else "ZineROM update available",
+                                                    message = if (arabic)
+                                                        "إصدار الروم ${romBuild.version} أقدم من 3.2.5. افتح الموقع للبحث عن أحدث إصدار وتحميله."
+                                                    else
+                                                        "ROM build ${romBuild.version} is older than 3.2.5. Open the website to find and download the latest build.",
+                                                    url = source.websiteUrl.ifBlank { DEFAULT_WEBSITE },
+                                                    action = if (arabic) "فتح الموقع" else "Open website"
+                                                )
+                                                if (arabic) "يتوفر تحديث جديد: $latestVersion" else "Update available: $latestVersion"
+                                            }
                                             else ->
-                                                if (arabic) "أنت على أحدث إصدار: $CURRENT_APP_VERSION"
-                                                else "You're up to date: $CURRENT_APP_VERSION"
+                                                if (arabic) "أنت على أحدث إصدار: $latestVersion" else "You're up to date: $latestVersion"
                                         }
                                     } catch (error: Exception) {
                                         status = (if (arabic) "فشل التحقق: " else "Check failed: ") +
