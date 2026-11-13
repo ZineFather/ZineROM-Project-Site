@@ -698,3 +698,5 @@ private fun GlassPanel(content: @Composable ColumnScope.() -> Unit) {
         verticalArrangement = Arrangement.spacedBy(10.dp), content = content
     )
 }
+
+// CI build trigger: verify the current ZineROM Info APK after notification workflow repair.
