@@ -40,8 +40,8 @@ android {
         minSdk = 26
         targetSdk = 35
         // Can be overridden for release builds; always keep it higher than the installed build.
-        versionCode = providers.gradleProperty("zineromVersionCode").orNull?.toInt() ?: 326
-        versionName = providers.gradleProperty("zineromVersionName").orNull ?: "3.2.6"
+        versionCode = providers.gradleProperty("zineromVersionCode").orNull?.toInt() ?: 327
+        versionName = providers.gradleProperty("zineromVersionName").orNull ?: "3.2.7"
     }
 
     signingConfigs {
