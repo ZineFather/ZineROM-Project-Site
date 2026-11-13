@@ -1,24 +1,35 @@
 package com.zinerom.info
 
+import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.work.*
+import coil.compose.AsyncImage
 import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.Dispatchers
@@ -28,85 +39,376 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 
-data class Device(val id:String,val name:String,val model:String?,val versions:List<String>)
-class MainActivity:ComponentActivity(){
- override fun onCreate(savedInstanceState:Bundle?){
-  super.onCreate(savedInstanceState)
-  val req=PeriodicWorkRequestBuilder<UpdateWorker>(24,TimeUnit.HOURS).build()
-  WorkManager.getInstance(this).enqueueUniquePeriodicWork("zinerom-update-check",ExistingPeriodicWorkPolicy.KEEP,req)
-  if (FirebaseApp.getApps(this).isNotEmpty()) {
-   val topic = when (android.os.Build.MODEL.uppercase()) {
-    "SM-A528B", "SM-A528N", "SM-A528U", "SM-A528W" -> "zinerom_a52s-5g"
-    "SM-A536B", "SM-A536E" -> "zinerom_a53-5g"
-    "SM-A346B", "SM-A346E" -> "zinerom_a34-5g"
-    "SM-A256B", "SM-A256E" -> "zinerom_a25-5g"
-    "SM-A155F" -> "zinerom_a15-4g"
-    "SM-A165F" -> "zinerom_a16-4g"
-    "SM-A115F" -> "zinerom_a11-4g"
-    "SM-A245F" -> "zinerom_a24-4g"
-    "SM-X216B" -> "zinerom_tab-a9-plus-5g-x216b"
-    else -> null
-   }
-   FirebaseMessaging.getInstance().subscribeToTopic("zinerom_all")
-   if (topic != null) FirebaseMessaging.getInstance().subscribeToTopic(topic)
-  }
-  setContent { ZineApp() }
- }
+private const val DEFAULT_TELEGRAM = "https://t.me/ZineROMProject/13/4542"
+private const val NOTIFICATION_CHANNEL = "zinerom_updates"
+private val httpClient = OkHttpClient()
+
+data class AppConfig(
+    val websiteUrl: String,
+    val releasesUrl: String,
+    val telegramUrl: String,
+    val changelogUrl: String,
+    val workflowUrl: String
+)
+data class Rom(val title: String, val version: String, val downloadUrl: String)
+data class Device(
+    val id: String, val name: String, val model: String?, val versions: List<String>,
+    val imageUrl: String?, val description: String?, val downloadUrl: String?, val roms: List<Rom>
+)
+data class Release(val title: String, val version: String, val deviceId: String, val downloadUrl: String?)
+
+private val Blue = Color(0xFF85BDFF)
+private val Background = Color(0xFF08111F)
+private val SurfaceDark = Color(0xFF14243A)
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        createUpdateChannel(this)
+        val work = PeriodicWorkRequestBuilder<UpdateWorker>(24, TimeUnit.HOURS).build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "zinerom-update-check", ExistingPeriodicWorkPolicy.KEEP, work
+        )
+        if (FirebaseApp.getApps(this).isNotEmpty()) {
+            FirebaseMessaging.getInstance().subscribeToTopic("zinerom_all")
+            val model = Build.MODEL.uppercase()
+            val topic = when {
+                model.startsWith("SM-A528") -> "zinerom_a52s-5g"
+                model.startsWith("SM-A536") -> "zinerom_a53-5g"
+                model.startsWith("SM-A346") -> "zinerom_a34-5g"
+                model.startsWith("SM-A256") -> "zinerom_a25-5g"
+                model == "SM-A155F" -> "zinerom_a15-4g"
+                model == "SM-A165F" -> "zinerom_a16-4g"
+                model == "SM-A115F" -> "zinerom_a11-4g"
+                model == "SM-A245F" -> "zinerom_a24-4g"
+                model == "SM-X216B" -> "zinerom_tab-a9-plus-5g-x216b"
+                else -> null
+            }
+            if (topic != null) FirebaseMessaging.getInstance().subscribeToTopic(topic)
+        }
+        setContent { ZineApp() }
+    }
 }
-class UpdateWorker(ctx:android.content.Context,p:WorkerParameters):CoroutineWorker(ctx,p){
- override suspend fun doWork():Result=try{
-  val req=Request.Builder().url("https://raw.githubusercontent.com/ZineFather/ZineROM-Project-Site/main/remote/releases.json").build()
-  OkHttpClient().newCall(req).execute().use { if(it.isSuccessful) Result.success() else Result.retry() }
- }catch(_:Exception){Result.retry()}
+
+private fun createUpdateChannel(context: Context) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val channel = NotificationChannel(
+            NOTIFICATION_CHANNEL, "ZineROM Updates", NotificationManager.IMPORTANCE_DEFAULT
+        )
+        context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+    }
 }
+
+private fun notifyUpdate(context: Context, version: String) {
+    if (Build.VERSION.SDK_INT >= 33 &&
+        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+    ) return
+    val notification = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL)
+        .setSmallIcon(android.R.drawable.stat_sys_download_done)
+        .setContentTitle("ZineROM info update available")
+        .setContentText("Version " + version + " is available. Open Telegram for the changelog.")
+        .setAutoCancel(true)
+        .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+        .build()
+    try { NotificationManagerCompat.from(context).notify(325, notification) } catch (_: SecurityException) { }
+}
+
+private fun versionIsNewer(remote: String, current: String): Boolean {
+    val a = remote.split(".").map { it.toIntOrNull() ?: 0 }
+    val b = current.split(".").map { it.toIntOrNull() ?: 0 }
+    for (index in 0 until maxOf(a.size, b.size)) {
+        val left = a.getOrElse(index) { 0 }
+        val right = b.getOrElse(index) { 0 }
+        if (left != right) return left > right
+    }
+    return false
+}
+
+private fun openLink(context: Context, url: String?) {
+    if (!url.isNullOrBlank() && url.startsWith("https://")) {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    }
+}
+
+private fun readConfig(context: Context): AppConfig {
+    val json = JSONObject(context.assets.open("app-config.json").bufferedReader().use { it.readText() })
+    return AppConfig(
+        websiteUrl = json.optString("website_url"),
+        releasesUrl = json.optString("releases_url"),
+        telegramUrl = json.optString("telegram_url", DEFAULT_TELEGRAM),
+        changelogUrl = json.optString("changelog_url", DEFAULT_TELEGRAM),
+        workflowUrl = json.optString("workflow_url")
+    )
+}
+
+private fun readDevices(context: Context): List<Device> {
+    val root = JSONObject(context.assets.open("devices.json").bufferedReader().use { it.readText() })
+    val array = root.getJSONArray("devices")
+    return (0 until array.length()).map { index ->
+        val item = array.getJSONObject(index)
+        val versions = item.optJSONArray("versions")
+        val romArray = item.optJSONArray("roms")
+        val roms = if (romArray == null) emptyList() else (0 until romArray.length()).map { n ->
+            val entry = romArray.getJSONObject(n)
+            Rom(entry.optString("title"), entry.optString("version"), entry.optString("download_url"))
+        }
+        Device(
+            id = item.getString("id"),
+            name = item.getString("name"),
+            model = item.optString("model").takeIf { it.isNotBlank() && it != "null" },
+            versions = if (versions == null) emptyList() else (0 until versions.length()).map { versions.getString(it) },
+            imageUrl = item.optString("image_url").takeIf { it.startsWith("https://") },
+            description = item.optString("description"),
+            downloadUrl = item.optString("download_url").takeIf { it.startsWith("https://") },
+            roms = roms
+        )
+    }
+}
+
+class UpdateWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+    override suspend fun doWork(): Result = try {
+        val config = readConfig(applicationContext)
+        val request = Request.Builder().url(config.releasesUrl).build()
+        val latest = httpClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw IllegalStateException("HTTP " + response.code)
+            JSONObject(response.body?.string().orEmpty()).optString("latest_app_version", BuildConfig.VERSION_NAME)
+        }
+        if (versionIsNewer(latest, BuildConfig.VERSION_NAME)) notifyUpdate(applicationContext, latest)
+        Result.success()
+    } catch (_: Exception) { Result.retry() }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable fun ZineApp(){
- val ctx=androidx.compose.ui.platform.LocalContext.current
- val scope=rememberCoroutineScope()
- var tab by remember{mutableStateOf("Home")}
- var isArabic by remember{mutableStateOf(false)}
- var devices by remember{mutableStateOf(emptyList<Device>())}
- var status by remember{mutableStateOf("Ready")}
- var releaseEntries by remember{mutableStateOf(emptyList<Pair<String,String?>>())}
- var notificationEnabled by remember{mutableStateOf(ctx.getSharedPreferences("zinerom_notifications",0).getBoolean("enabled",true))}
- var notificationHistory by remember{mutableStateOf(emptyList<Pair<String,String>>())}
- LaunchedEffect(Unit){
-  val prefs=ctx.getSharedPreferences("zinerom_notifications",0)
-  notificationHistory=try{val a=org.json.JSONArray(prefs.getString("history","[]"));(0 until a.length()).map{i->val x=a.getJSONObject(i);Pair(x.optString("title"),x.optString("message"))}}catch(_:Exception){emptyList()}
-  devices=withContext(Dispatchers.IO){
-   val root=JSONObject(ctx.assets.open("devices.json").bufferedReader().use{it.readText()})
-   val a=root.getJSONArray("devices")
-   (0 until a.length()).map{ i-> val d=a.getJSONObject(i);val v=d.getJSONArray("versions");Device(d.getString("id"),d.getString("name"),if(d.isNull("model"))null else d.getString("model"),(0 until v.length()).map{v.getString(it)})}
-  }
- }
- MaterialTheme(colorScheme=darkColorScheme(primary=Color(0xFF85BDFF),background=Color(0xFF08111F),surface=Color(0xFF14243A))){
-  CompositionLocalProvider(LocalLayoutDirection provides if(isArabic) LayoutDirection.Rtl else LayoutDirection.Ltr) {
-  Scaffold(containerColor=Color(0xFF08111F),topBar={TopAppBar(title={Text("ZineROM INFO")},actions={TextButton(onClick={isArabic=!isArabic}){Text(if(isArabic)"EN" else "عربي",color=Color.White)}},colors=TopAppBarDefaults.topAppBarColors(containerColor=Color(0xFF08111F),titleContentColor=Color.White))},bottomBar={
-   NavigationBar(containerColor=Color(0xFF14243A)){listOf("Home","Devices","Updates","Notifications","About").forEach{t->NavigationBarItem(selected=tab==t,onClick={tab=t},icon={Icon(when(t){"Devices"->Icons.Default.PhoneAndroid;"Updates"->Icons.Default.SystemUpdate;"Notifications"->Icons.Default.Notifications;"About"->Icons.Default.Info;else->Icons.Default.Home},t)},label={Text(if(isArabic) when(t){"Home"->"الرئيسية";"Devices"->"الأجهزة";"Updates"->"التحديثات";"Notifications"->"الإشعارات";else->"حول"} else t)})}}
-  }){pad->
-   when(tab){
-    "Devices"->LazyColumn(Modifier.fillMaxSize().padding(pad).padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
-     item{Text(if(isArabic)"الأجهزة المدعومة" else "Supported devices",style=MaterialTheme.typography.headlineSmall,color=Color.White)}
-     items(devices){d->ElevatedCard(Modifier.fillMaxWidth(),colors=CardDefaults.elevatedCardColors(containerColor=Color(0xFF14243A))){Column(Modifier.padding(16.dp)){Text(d.name,color=Color.White,style=MaterialTheme.typography.titleMedium);Text(d.model?:"Model not specified",color=Color.LightGray);Text(if(d.versions.isEmpty())"No ROM release listed" else "One UI "+d.versions.joinToString(" · "),color=Color(0xFF85BDFF))}}}
+@Composable
+fun ZineApp() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var config by remember { mutableStateOf<AppConfig?>(null) }
+    var devices by remember { mutableStateOf(emptyList<Device>()) }
+    var selectedDevice by remember { mutableStateOf<Device?>(null) }
+    var tab by remember { mutableStateOf("Home") }
+    var arabic by remember { mutableStateOf(false) }
+    var checking by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf("Ready") }
+    var latestVersion by remember { mutableStateOf("") }
+    var releases by remember { mutableStateOf(emptyList<Release>()) }
+
+    LaunchedEffect(Unit) {
+        config = withContext(Dispatchers.IO) { readConfig(context) }
+        devices = withContext(Dispatchers.IO) { readDevices(context) }
     }
-    "Updates"->Column(Modifier.padding(pad).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)){
-     Text(if(isArabic)"تحديثات النظام" else "Software updates",style=MaterialTheme.typography.headlineSmall,color=Color.White)
-     Button(onClick={status="Checking…";scope.launch{try{val result=withContext(Dispatchers.IO){val request=Request.Builder().url("https://raw.githubusercontent.com/ZineFather/ZineROM-Project-Site/main/remote/releases.json").build();OkHttpClient().newCall(request).execute().use{response->if(!response.isSuccessful) throw IllegalStateException("HTTP ${response.code}");val a=JSONObject(response.body?.string().orEmpty()).optJSONArray("releases")?:org.json.JSONArray();(0 until a.length()).map{i->val x=a.getJSONObject(i);Pair("${x.optString("title","ZineROM")} · ${x.optString("version")} · ${x.optString("device_id")}",x.optString("download_url").takeIf{u->u.startsWith("https://")})}}};releaseEntries=result;status="Check complete · ${result.size} release(s)"}catch(e:Exception){status="Check failed: ${e.localizedMessage}"}}}){Text(if(isArabic)"تحقق الآن" else "Check now")}
-     Text(status,color=Color(0xFF85BDFF))
-     releaseEntries.forEach{entry->ElevatedCard(colors=CardDefaults.elevatedCardColors(containerColor=Color(0xFF14243A))){Column(Modifier.padding(12.dp)){Text(entry.first,color=Color.White);if(entry.second!=null)TextButton(onClick={ctx.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(entry.second)))}){Text(if(isArabic)"تحميل الإصدار" else "Download release")}}}}
+
+    MaterialTheme(colorScheme = darkColorScheme(primary = Blue, background = Background, surface = SurfaceDark)) {
+        CompositionLocalProvider(LocalLayoutDirection provides if (arabic) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+            Scaffold(
+                containerColor = Background,
+                topBar = {
+                    TopAppBar(
+                        title = { Text("ZineROM info") },
+                        actions = { TextButton(onClick = { arabic = !arabic }) { Text(if (arabic) "EN" else "عربي", color = Color.White) } },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Background, titleContentColor = Color.White)
+                    )
+                },
+                bottomBar = {
+                    NavigationBar(containerColor = SurfaceDark) {
+                        listOf("Home", "Devices", "Updates", "About").forEach { item ->
+                            NavigationBarItem(
+                                selected = tab == item,
+                                onClick = { selectedDevice = null; tab = item },
+                                icon = {
+                                    Icon(when (item) {
+                                        "Devices" -> Icons.Default.PhoneAndroid
+                                        "Updates" -> Icons.Default.SystemUpdate
+                                        "About" -> Icons.Default.Info
+                                        else -> Icons.Default.Home
+                                    }, contentDescription = item)
+                                },
+                                label = { Text(if (arabic) when (item) {
+                                    "Home" -> "الرئيسية"; "Devices" -> "الأجهزة"; "Updates" -> "التحديثات"; else -> "حول"
+                                } else item) }
+                            )
+                        }
+                    }
+                }
+            ) { padding ->
+                when {
+                    selectedDevice != null -> DeviceDetails(
+                        device = selectedDevice!!, arabic = arabic,
+                        onBack = { selectedDevice = null },
+                        onDownload = { openLink(context, it) }
+                    )
+                    tab == "Devices" -> LazyColumn(
+                        Modifier.fillMaxSize().padding(padding).padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        item { Text(if (arabic) "الأجهزة المدعومة" else "Supported devices", color = Color.White, style = MaterialTheme.typography.headlineSmall) }
+                        items(devices, key = { it.id }) { device ->
+                            ElevatedCard(
+                                modifier = Modifier.fillMaxWidth().clickable { selectedDevice = device },
+                                colors = CardDefaults.elevatedCardColors(containerColor = SurfaceDark),
+                                shape = RoundedCornerShape(18.dp)
+                            ) {
+                                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    AsyncImage(device.imageUrl, device.name, Modifier.size(88.dp), contentScale = ContentScale.Fit)
+                                    Spacer(Modifier.width(14.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(device.name, color = Color.White, style = MaterialTheme.typography.titleMedium)
+                                        Text(device.model ?: "Model not specified", color = Color.LightGray)
+                                        Text(if (device.versions.isEmpty()) "Check website for availability" else "One UI " + device.versions.joinToString(" · "), color = Blue)
+                                    }
+                                    Icon(Icons.Default.ChevronRight, contentDescription = "Open", tint = Blue)
+                                }
+                            }
+                        }
+                    }
+                    tab == "Updates" -> Column(
+                        Modifier.fillMaxSize().padding(padding).padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Text(if (arabic) "تحديثات التطبيق" else "App updates", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+                        Text("Installed version: " + BuildConfig.VERSION_NAME, color = Color.LightGray)
+                        Button(enabled = !checking, onClick = {
+                            checking = true
+                            status = if (arabic) "جارٍ التحقق..." else "Checking for updates..."
+                            scope.launch {
+                                try {
+                                    val feed = withContext(Dispatchers.IO) {
+                                        val source = config ?: readConfig(context)
+                                        val request = Request.Builder().url(source.releasesUrl).build()
+                                        httpClient.newCall(request).execute().use { response ->
+                                            if (!response.isSuccessful) throw IllegalStateException("HTTP " + response.code)
+                                            JSONObject(response.body?.string().orEmpty())
+                                        }
+                                    }
+                                    latestVersion = feed.optString("latest_app_version", BuildConfig.VERSION_NAME)
+                                    val hasUpdate = versionIsNewer(latestVersion, BuildConfig.VERSION_NAME)
+                                    val entries = feed.optJSONArray("releases") ?: org.json.JSONArray()
+                                    releases = (0 until entries.length()).map { i ->
+                                        val entry = entries.getJSONObject(i)
+                                        Release(
+                                            entry.optString("title", "ZineROM"),
+                                            entry.optString("version"),
+                                            entry.optString("device_id"),
+                                            entry.optString("download_url").takeIf { it.startsWith("https://") }
+                                        )
+                                    }
+                                    status = if (hasUpdate) {
+                                        if (arabic) "يتوفر تحديث جديد: " + latestVersion else "Update available: " + latestVersion
+                                    } else {
+                                        if (arabic) "أنت على أحدث إصدار: " + BuildConfig.VERSION_NAME else "You're up to date: " + BuildConfig.VERSION_NAME
+                                    }
+                                    if (hasUpdate) notifyUpdate(context, latestVersion)
+                                } catch (error: Exception) {
+                                    status = (if (arabic) "فشل التحقق: " else "Check failed: ") + (error.localizedMessage ?: "Network error")
+                                } finally { checking = false }
+                            }
+                        }) { Text(if (checking) "Checking..." else if (arabic) "تحقق من التحديثات" else "Check for updates") }
+                        Text(status, color = Blue)
+                        if (latestVersion.isNotBlank()) {
+                            OutlinedButton(onClick = { openLink(context, config?.changelogUrl ?: DEFAULT_TELEGRAM) }) {
+                                Text(if (arabic) "عرض سجل التغييرات على تيليجرام" else "View changelog on Telegram")
+                            }
+                        }
+                        OutlinedButton(onClick = { openLink(context, config?.workflowUrl) }) {
+                            Text(if (arabic) "فتح GitHub Actions" else "Run / View GitHub Workflow")
+                        }
+                        releases.forEach { release ->
+                            ElevatedCard(colors = CardDefaults.elevatedCardColors(containerColor = SurfaceDark)) {
+                                Column(Modifier.padding(12.dp)) {
+                                    Text(release.title, color = Color.White)
+                                    Text("Version " + release.version + " · " + release.deviceId, color = Color.LightGray)
+                                    if (release.downloadUrl != null) TextButton(onClick = { openLink(context, release.downloadUrl) }) { Text("Download") }
+                                }
+                            }
+                        }
+                    }
+                    tab == "About" -> Column(Modifier.padding(padding).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("ZineROM info", color = Color.White, style = MaterialTheme.typography.headlineSmall)
+                        Text("Version " + BuildConfig.VERSION_NAME, color = Blue)
+                        Text("Official ZineROM project companion.", color = Color.LightGray)
+                        TextButton(onClick = { openLink(context, config?.websiteUrl) }) { Text("Official website") }
+                    }
+                    else -> Column(Modifier.padding(padding).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Text("ZineROM info", color = Color.White, style = MaterialTheme.typography.headlineLarge)
+                        Text(if (arabic) "رفيقك لمشروع ZineROM" else "Your ZineROM project companion", color = Blue, style = MaterialTheme.typography.titleMedium)
+                        ElevatedCard(colors = CardDefaults.elevatedCardColors(containerColor = SurfaceDark)) {
+                            Column(Modifier.padding(18.dp)) {
+                                Text(devices.size.toString() + " supported devices", color = Color.White)
+                                Text(if (arabic) "تصفح إصدارات الرومات ومعلومات الأجهزة." else "Browse ROM versions and device information.", color = Color.LightGray)
+                                TextButton(onClick = { tab = "Devices" }) { Text(if (arabic) "تصفح الأجهزة" else "Browse devices") }
+                            }
+                        }
+                        ElevatedCard(colors = CardDefaults.elevatedCardColors(containerColor = SurfaceDark)) {
+                            Column(Modifier.padding(18.dp)) {
+                                Text(if (arabic) "فحص التحديثات" else "App update checker", color = Color.White)
+                                Text("Installed version " + BuildConfig.VERSION_NAME, color = Color.LightGray)
+                                TextButton(onClick = { tab = "Updates" }) { Text(if (arabic) "فحص الإصدارات" else "Check releases") }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
-    "Notifications"->Column(Modifier.fillMaxSize().padding(pad).padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
-     Text(if(isArabic)"الإشعارات" else "Notifications",color=Color.White,style=MaterialTheme.typography.headlineSmall)
-     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(if(isArabic)"السماح بإشعارات ZineROM" else "Allow ZineROM notifications",color=Color.White);Switch(checked=notificationEnabled,onCheckedChange={value->notificationEnabled=value;ctx.getSharedPreferences("zinerom_notifications",0).edit().putBoolean("enabled",value).apply()})}
-     Text(if(isArabic)"سجل الإشعارات" else "Recent notification history",color=Color(0xFF85BDFF))
-     if(notificationHistory.isEmpty()) Text(if(isArabic)"لا توجد إشعارات حتى الآن." else "No notifications received yet.",color=Color.LightGray)
-     notificationHistory.forEach{item->ElevatedCard(colors=CardDefaults.elevatedCardColors(containerColor=Color(0xFF14243A))){Column(Modifier.padding(12.dp)){Text(item.first,color=Color.White);Text(item.second,color=Color.LightGray)}}}
+}
+
+@Composable
+private fun DeviceDetails(
+    device: Device, arabic: Boolean, onBack: () -> Unit, onDownload: (String?) -> Unit
+) {
+    LazyColumn(
+        Modifier.fillMaxSize().padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        item {
+            TextButton(onClick = onBack) {
+                Icon(Icons.Default.ArrowBack, contentDescription = null)
+                Spacer(Modifier.width(6.dp))
+                Text(if (arabic) "رجوع" else "Back")
+            }
+            AsyncImage(
+                model = device.imageUrl, contentDescription = device.name,
+                modifier = Modifier.fillMaxWidth().height(230.dp), contentScale = ContentScale.Fit
+            )
+            Text(device.name, color = Color.White, style = MaterialTheme.typography.headlineSmall)
+            Text(device.model ?: "Model not specified", color = Blue)
+            Text(device.description ?: "", color = Color.LightGray)
+            Text(if (arabic) "إصدارات One UI المدعومة" else "Supported One UI versions", color = Color.White, style = MaterialTheme.typography.titleMedium)
+            Text(
+                if (device.versions.isEmpty()) {
+                    if (arabic) "لا توجد إصدارات موثقة بعد." else "No verified versions listed yet."
+                } else device.versions.joinToString(" · ") { "One UI " + it },
+                color = Color.LightGray
+            )
+            if (device.roms.isEmpty()) {
+                Button(onClick = { onDownload(device.downloadUrl) }, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (arabic) "فتح صفحة التحميل الرسمية" else "Open official download page")
+                }
+            } else {
+                Text(if (arabic) "إصدارات ZineROM" else "ZineROM builds", color = Color.White, style = MaterialTheme.typography.titleMedium)
+            }
+        }
+        items(device.roms) { rom ->
+            ElevatedCard(colors = CardDefaults.elevatedCardColors(containerColor = SurfaceDark)) {
+                Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                    Text(rom.title, color = Color.White)
+                    Text("One UI " + rom.version, color = Blue)
+                    Button(onClick = { onDownload(rom.downloadUrl) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(if (arabic) "تحميل Download" else "Download")
+                    }
+                }
+            }
+        }
+        if (device.roms.isNotEmpty()) {
+            item {
+                OutlinedButton(onClick = { onDownload(device.downloadUrl) }, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (arabic) "صفحة الجهاز على الموقع" else "Device page on website")
+                }
+            }
+        }
     }
-    "About"->Column(Modifier.padding(pad).padding(20.dp)){Text(if(isArabic)"حول ZineROM Info" else "About ZineROM Info",color=Color.White,style=MaterialTheme.typography.headlineSmall);Text(if(isArabic)"التطبيق الرسمي المصاحب لمشروع ZineROM." else "Official companion for the ZineROM Project.",color=Color.LightGray);Text("https://zinefather.github.io/ZineROM-Project-Site/",color=Color(0xFF85BDFF))}
-    else->Column(Modifier.padding(pad).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)){Text("ZineROM Info",color=Color.White,style=MaterialTheme.typography.headlineLarge);Text(if(isArabic)"رفيقك لمشروع ZineROM" else "Your ZineROM project companion",color=Color(0xFF85BDFF),style=MaterialTheme.typography.titleMedium);ElevatedCard(colors=CardDefaults.elevatedCardColors(containerColor=Color(0xFF14243A))){Column(Modifier.padding(18.dp)){Text("${devices.size} supported catalog devices",color=Color.White);Text(if(isArabic)"تصفح إصدارات الرومات ومعلومات الأجهزة." else "Browse ROM versions and device information.",color=Color.LightGray);TextButton(onClick={tab="Devices"}){Text(if(isArabic)"تصفح الأجهزة" else "Browse devices")}}};ElevatedCard(colors=CardDefaults.elevatedCardColors(containerColor=Color(0xFF14243A))){Column(Modifier.padding(18.dp)){Text(if(isArabic)"فحص التحديثات تلقائياً" else "Automatic update checks",color=Color.White);Text("Background checks are scheduled approximately every 24 hours.",color=Color.LightGray);TextButton(onClick={tab="Updates"}){Text(if(isArabic)"فحص الإصدارات" else "Check releases")}}}}
-   }
-  }
-  }
- }
 }
