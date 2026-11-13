@@ -318,6 +318,11 @@ private fun saveModuleToDownloads(context: Context, module: DeviceModule) {
     }
 }
 
+private fun devicePageUrl(websiteUrl: String, deviceId: String): String {
+    val base = websiteUrl.trim().substringBefore("#").trimEnd('/')
+    return "$base/#/devices/${Uri.encode(deviceId)}"
+}
+
 private fun openLink(context: Context, url: String?) {
     if (!url.isNullOrBlank() && url.startsWith("https://")) {
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
@@ -624,7 +629,11 @@ fun ZineApp() {
                         } else {
                             DevicesScreen(
                                 devices, arabic, Modifier.fillMaxSize(),
-                                onDevice = { selectedDevice = it }
+                                onDevice = {
+                                    val site = config?.websiteUrl?.takeIf { url -> url.startsWith("https://") }
+                                        ?: DEFAULT_WEBSITE
+                                    openLink(context, devicePageUrl(site, it.id))
+                                }
                             )
                         }
                     }
