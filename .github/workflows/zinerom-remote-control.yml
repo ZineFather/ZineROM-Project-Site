@@ -1,0 +1,228 @@
+name: ZineROM Remote Control
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: "ROM release version (example: 3.2.5)"
+        type: string
+        required: false
+      previous_version:
+        description: "Previous version"
+        type: string
+        required: false
+      target_device:
+        description: "Device targeted by release and notification"
+        type: choice
+        required: true
+        default: all
+        options:
+          - all
+          - a15-4g
+          - a15-5g
+          - a16-4g
+          - a16-5g
+          - a25-5g
+          - a34-5g
+          - a53-5g
+          - a52s-5g
+          - a11-4g
+          - a24-4g
+          - tab-a9-plus-5g-x216b
+      release_title:
+        description: "Release title"
+        type: string
+        required: false
+      release_message:
+        description: "Release message"
+        type: string
+        required: false
+      download_url:
+        description: "HTTPS ROM download URL"
+        type: string
+        required: false
+      release_notes_url:
+        description: "HTTPS release notes URL"
+        type: string
+        required: false
+      publish_release:
+        description: "Publish/update release metadata"
+        type: boolean
+        required: true
+        default: false
+      notification_type:
+        description: "Notification type"
+        type: choice
+        required: true
+        default: NONE
+        options: [UPDATE, ANNOUNCEMENT, WARNING, MAINTENANCE, CUSTOM, NONE]
+      notification_title:
+        description: "Notification title"
+        type: string
+        required: false
+      notification_message:
+        description: "Notification message"
+        type: string
+        required: false
+      button_enabled:
+        description: "Show action button"
+        type: boolean
+        required: true
+        default: false
+      button_text:
+        description: "Action button label"
+        type: string
+        required: false
+      button_url:
+        description: "HTTPS action button URL"
+        type: string
+        required: false
+      target_version:
+        description: "Version associated with notification"
+        type: string
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout development branch
+        uses: actions/checkout@v4
+        with:
+          ref: zinerom-info-development
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate inputs and prepare metadata
+        env:
+          RELEASE_VERSION: ${{ inputs.release_version }}
+          PREVIOUS_VERSION: ${{ inputs.previous_version }}
+          TARGET_DEVICE: ${{ inputs.target_device }}
+          RELEASE_TITLE: ${{ inputs.release_title }}
+          RELEASE_MESSAGE: ${{ inputs.release_message }}
+          DOWNLOAD_URL: ${{ inputs.download_url }}
+          RELEASE_NOTES_URL: ${{ inputs.release_notes_url }}
+          PUBLISH_RELEASE: ${{ inputs.publish_release }}
+          NOTIFICATION_TYPE: ${{ inputs.notification_type }}
+          NOTIFICATION_TITLE: ${{ inputs.notification_title }}
+          NOTIFICATION_MESSAGE: ${{ inputs.notification_message }}
+          BUTTON_ENABLED: ${{ inputs.button_enabled }}
+          BUTTON_TEXT: ${{ inputs.button_text }}
+          BUTTON_URL: ${{ inputs.button_url }}
+          TARGET_VERSION: ${{ inputs.target_version }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const https = value => !value || /^https:\/\//i.test(value);
+          const device = process.env.TARGET_DEVICE;
+          if (process.env.PUBLISH_RELEASE === 'true') {
+            if (!process.env.RELEASE_VERSION || !process.env.RELEASE_TITLE || !process.env.DOWNLOAD_URL) {
+              throw new Error('Release publishing requires release_version, release_title and download_url.');
+            }
+            if (!https(process.env.DOWNLOAD_URL) || !https(process.env.RELEASE_NOTES_URL)) {
+              throw new Error('Download and notes URLs must use HTTPS.');
+            }
+            const file = 'remote/releases.json';
+            const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+            data.releases = (data.releases || []).filter(x => !(x.device_id === device && x.version === process.env.RELEASE_VERSION));
+            data.releases.unshift({
+              device_id: device, version: process.env.RELEASE_VERSION,
+              previous_version: process.env.PREVIOUS_VERSION || null,
+              title: process.env.RELEASE_TITLE, message: process.env.RELEASE_MESSAGE || '',
+              download_url: process.env.DOWNLOAD_URL,
+              release_notes_url: process.env.RELEASE_NOTES_URL || null,
+              published_at: new Date().toISOString()
+            });
+            data.updated_at = new Date().toISOString();
+            fs.writeFileSync(file, JSON.stringify(data, null, 2) + '\n');
+            console.log('Release metadata prepared.');
+          } else {
+            console.log('publish_release=false; release metadata unchanged.');
+          }
+          if (process.env.NOTIFICATION_TYPE !== 'NONE') {
+            if (!process.env.NOTIFICATION_TITLE || !process.env.NOTIFICATION_MESSAGE) {
+              throw new Error('Notifications require notification_title and notification_message.');
+            }
+            if (process.env.BUTTON_ENABLED === 'true' && (!process.env.BUTTON_TEXT || !/^https:\/\//i.test(process.env.BUTTON_URL || ''))) {
+              throw new Error('Enabled button requires button_text and an HTTPS button_url.');
+            }
+            const file = 'remote/notifications.json';
+            const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+            data.notifications = data.notifications || [];
+            data.notifications.unshift({
+              type: process.env.NOTIFICATION_TYPE, device_id: device,
+              target_version: process.env.TARGET_VERSION || null,
+              title: process.env.NOTIFICATION_TITLE, message: process.env.NOTIFICATION_MESSAGE,
+              button_enabled: process.env.BUTTON_ENABLED === 'true',
+              button_text: process.env.BUTTON_TEXT || null,
+              button_url: process.env.BUTTON_URL || null,
+              created_at: new Date().toISOString()
+            });
+            data.notifications = data.notifications.slice(0, 100);
+            fs.writeFileSync(file, JSON.stringify(data, null, 2) + '\n');
+            console.log('Notification metadata prepared; delivery is a separate verified step.');
+          } else {
+            console.log('notification_type=NONE; no push notification will be sent.');
+          }
+          NODE
+
+      - name: Send FCM notification
+        if: inputs.notification_type != 'NONE'
+        env:
+          FCM_SERVICE_ACCOUNT_JSON: ${{ secrets.FCM_SERVICE_ACCOUNT_JSON }}
+          TARGET_DEVICE: ${{ inputs.target_device }}
+          NOTIFICATION_TYPE: ${{ inputs.notification_type }}
+          NOTIFICATION_TITLE: ${{ inputs.notification_title }}
+          NOTIFICATION_MESSAGE: ${{ inputs.notification_message }}
+          TARGET_VERSION: ${{ inputs.target_version }}
+          BUTTON_ENABLED: ${{ inputs.button_enabled }}
+          BUTTON_TEXT: ${{ inputs.button_text }}
+          BUTTON_URL: ${{ inputs.button_url }}
+        run: |
+          set -euo pipefail
+          test -n "$FCM_SERVICE_ACCOUNT_JSON" || { echo "::error::Add FCM_SERVICE_ACCOUNT_JSON to repository Actions secrets. No notification was sent."; exit 1; }
+          npm install --no-save google-auth-library
+          node <<'NODE'
+          const {GoogleAuth} = require('google-auth-library');
+          (async () => {
+            const credentials = JSON.parse(process.env.FCM_SERVICE_ACCOUNT_JSON);
+            const auth = new GoogleAuth({credentials, scopes:['https://www.googleapis.com/auth/firebase.messaging']});
+            const client = await auth.getClient();
+            const token = (await client.getAccessToken()).token;
+            if (!token || !credentials.project_id) throw new Error('FCM service account is missing project_id or access token.');
+            const topic = process.env.TARGET_DEVICE === 'all' ? 'zinerom_all' : 'zinerom_' + process.env.TARGET_DEVICE.replace(/[^a-zA-Z0-9_-]/g, '_');
+            const data = {
+              type: process.env.NOTIFICATION_TYPE,
+              title: process.env.NOTIFICATION_TITLE,
+              message: process.env.NOTIFICATION_MESSAGE,
+              target_version: process.env.TARGET_VERSION || '',
+              button_enabled: process.env.BUTTON_ENABLED,
+              button_text: process.env.BUTTON_TEXT || '',
+              button_url: process.env.BUTTON_URL || ''
+            };
+            const response = await fetch(`https://fcm.googleapis.com/v1/projects/${credentials.project_id}/messages:send`, {
+              method:'POST',
+              headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},
+              body:JSON.stringify({message:{topic,notification:{title:data.title,body:data.message},data,android:{priority:'HIGH'}}})
+            });
+            const body = await response.text();
+            if (!response.ok) throw new Error(`FCM delivery failed (${response.status}): ${body}`);
+            console.log('FCM accepted the message for topic ' + topic + ': ' + body);
+          })().catch(error => { console.error(error); process.exit(1); });
+          NODE
+
+      - name: Commit and push metadata
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add remote/releases.json remote/notifications.json
+          if git diff --cached --quiet; then
+            echo "No remote metadata changes to commit."
+          else
+            git commit -m "chore(remote): publish ZineROM release or notification"
+            git push origin HEAD:zinerom-info-development
+          fi
