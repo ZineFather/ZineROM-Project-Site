@@ -4,7 +4,8 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
+    <!-- Monochrome alpha mask: transparent canvas, compact white glyph with safe padding. -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M5,5h14v3L9,17h10v2H5v-3L15,7H5z" />
+        android:pathData="M7,7h10v2L10,15h7v2H7v-2L14,9H7z" />
 </vector>
