@@ -161,12 +161,13 @@ private fun readRomBuildInfo(): RomBuildInfo? {
         .map { it.trim() }
         .filter { it.isNotEmpty() }
 
-    val zineBuild = candidates.firstOrNull { it.contains("ZineROM", ignoreCase = true) }
-        ?: return null
+    val combinedBuild = candidates.joinToString(" | ")
+    if (!combinedBuild.contains("ZineROM", ignoreCase = true)) return null
+
     val version = Regex("""(?<!\d)(\d+\.\d+\.\d+(?:\.\d+)?)(?!\d)""")
-        .find(zineBuild)?.groupValues?.getOrNull(1)
+        .find(combinedBuild)?.groupValues?.getOrNull(1)
         ?: return null
-    return RomBuildInfo(zineBuild, version)
+    return RomBuildInfo(combinedBuild, version)
 }
 
 private fun readStringSet(json: JSONObject, vararg keys: String): Set<String> {
