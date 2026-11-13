@@ -1,0 +1,16 @@
+{
+ "website":"https://zinefather.github.io/ZINE-ROM-Project-Site/",
+ "devices":[
+  {"id":"a15-4g","name":"Galaxy A15 4G","model":"SM-A155F","versions":["9.0"]},
+  {"id":"a15-5g","name":"Galaxy A15 5G","model":null,"versions":[]},
+  {"id":"a16-4g","name":"Galaxy A16 4G","model":"SM-A165F","versions":["9.0"]},
+  {"id":"a16-5g","name":"Galaxy A16 5G","model":null,"versions":["9.0"]},
+  {"id":"a25-5g","name":"Galaxy A25 5G","model":"SM-A256 family","versions":["8.5"]},
+  {"id":"a34-5g","name":"Galaxy A34 5G","model":"SM-A346 family","versions":["9.0"]},
+  {"id":"a53-5g","name":"Galaxy A53 5G","model":"SM-A536 family","versions":["8.5"]},
+  {"id":"a52s-5g","name":"Galaxy A52s 5G","model":"SM-A528 family","versions":["5.1","6.1","7.0"]},
+  {"id":"a11-4g","name":"Galaxy A11","model":"SM-A115F","versions":["7.0"]},
+  {"id":"a24-4g","name":"Galaxy A24","model":"SM-A245F","versions":["9.0"]},
+  {"id":"tab-a9-plus-5g-x216b","name":"Galaxy Tab A9+ 5G","model":"SM-X216B","versions":[]}
+ ]
+}
