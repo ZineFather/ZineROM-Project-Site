@@ -48,7 +48,7 @@ jobs:
     steps:
       - name: Validate Firebase credentials
         env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ (secrets.FIREBASE_SERVICE_ACCOUNT || secrets.FCM_SERVICE_ACCOUNT_JSON) }}
         run: |
           set -euo pipefail
           if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
@@ -62,7 +62,7 @@ jobs:
         id: auth
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          credentials_json: ${{ (secrets.FIREBASE_SERVICE_ACCOUNT || secrets.FCM_SERVICE_ACCOUNT_JSON) }}
           token_format: access_token
 
       - name: Send FCM topic notification
