@@ -7,6 +7,8 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.util.Log
+import androidx.core.app.NotificationCompat
+import com.zinerom.info.R
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import org.json.JSONArray
@@ -16,26 +18,18 @@ class ZineFirebaseMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
-
         val preferences = getSharedPreferences("zinerom_notifications", MODE_PRIVATE)
-        if (!preferences.getBoolean("enabled", true)) {
-            Log.i(TAG, "Notification skipped because notifications are disabled in app settings")
-            return
-        }
+        if (!preferences.getBoolean("enabled", true)) return
 
-        val title = message.data["title"]
-            ?: message.notification?.title
-            ?: "ZineROM"
-        val body = message.data["message"]
-            ?: message.notification?.body
-            ?: ""
+        val title = message.data["title"] ?: message.notification?.title ?: "ZineROM"
+        val body = message.data["message"] ?: message.notification?.body.orEmpty()
 
         try {
             saveToHistory(preferences, message, title, body)
-            showNotification(message, title, body)
-            Log.i(TAG, "FCM message displayed. messageId=${message.messageId ?: "unknown"}")
+            showHeadsUpNotification(message, title, body)
+            Log.i(TAG, "FCM notification posted: ${message.messageId ?: "unknown"}")
         } catch (error: Exception) {
-            Log.e(TAG, "Failed to process incoming FCM message", error)
+            Log.e(TAG, "Unable to post FCM notification", error)
         }
     }
 
@@ -50,7 +44,6 @@ class ZineFirebaseMessagingService : FirebaseMessagingService() {
         } catch (_: Exception) {
             JSONArray()
         }
-
         val item = JSONObject()
             .put("title", title)
             .put("message", body)
@@ -60,7 +53,6 @@ class ZineFirebaseMessagingService : FirebaseMessagingService() {
             .put("target_device", message.data["target_device"] ?: "")
             .put("button_text", message.data["button_text"] ?: "")
             .put("button_url", message.data["button_url"] ?: "")
-
         val updated = JSONArray().put(item)
         for (index in 0 until minOf(history.length(), 49)) {
             updated.put(history.getJSONObject(index))
@@ -68,39 +60,49 @@ class ZineFirebaseMessagingService : FirebaseMessagingService() {
         preferences.edit().putString("history", updated.toString()).apply()
     }
 
-    private fun showNotification(message: RemoteMessage, title: String, body: String) {
-        val channelId = "zinerom_updates"
+    private fun showHeadsUpNotification(message: RemoteMessage, title: String, body: String) {
+        val channelId = "zinerom_alerts_v2"
         val manager = getSystemService(NotificationManager::class.java)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            manager.createNotificationChannel(
-                NotificationChannel(
-                    channelId,
-                    "ZineROM Updates",
-                    NotificationManager.IMPORTANCE_DEFAULT
+            val existing = manager.getNotificationChannel(channelId)
+            if (existing == null) {
+                manager.createNotificationChannel(
+                    NotificationChannel(
+                        channelId,
+                        "ZineROM Alerts",
+                        NotificationManager.IMPORTANCE_HIGH
+                    ).apply {
+                        description = "Important ZineROM announcements and update alerts"
+                        enableVibration(true)
+                        enableLights(true)
+                        setShowBadge(true)
+                    }
                 )
-            )
+            }
         }
 
         val destination = message.data["button_url"]
             ?.takeIf { it.startsWith("https://") }
             ?: "https://zinefather.github.io/ZineROM-Project-Site/"
-
-        val openWebsite = Intent(Intent.ACTION_VIEW, Uri.parse(destination))
         val pendingIntent = PendingIntent.getActivity(
             this,
             (System.currentTimeMillis() % Int.MAX_VALUE).toInt(),
-            openWebsite,
+            Intent(Intent.ACTION_VIEW, Uri.parse(destination)),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = android.app.Notification.Builder(this, channelId)
-            .setSmallIcon(android.R.drawable.stat_notify_sync)
+        val notification = NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(title)
             .setContentText(body)
-            .setStyle(android.app.Notification.BigTextStyle().bigText(body))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .build()
 
         manager.notify(
