@@ -124,8 +124,10 @@ jobs:
 
           DISPLAY_MESSAGE="$MESSAGE"
           if [ -n "$TARGET_VERSION" ]; then
-            DISPLAY_MESSAGE="$DISPLAY_MESSAGE"
-            DISPLAY_MESSAGE="$MESSAGE"$'\n\n'"Target device: $TARGET_LABEL"
+            DISPLAY_MESSAGE="$DISPLAY_MESSAGE"$'\n\n'"Version: $TARGET_VERSION"
+          fi
+          if [ "$TARGET" != "ALL" ]; then
+            DISPLAY_MESSAGE="$DISPLAY_MESSAGE"$'\n\n'"Target device: $TARGET_LABEL"
           fi
 
           PAYLOAD=$(jq -n \
