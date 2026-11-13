@@ -1103,8 +1103,6 @@ private fun SectionHeading(title: String, subtitle: String) {
 }
 
 @Composable
-
-@Composable
 private fun DeviceAssetImage(
     assetPath: String?,
     contentDescription: String,
@@ -1232,6 +1230,7 @@ private fun ModulesScreen(
     }
 }
 
+@Composable
 private fun GlassPanel(content: @Composable ColumnScope.() -> Unit) {
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp))
