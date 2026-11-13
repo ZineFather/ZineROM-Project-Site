@@ -14,6 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.work.*
+import com.google.firebase.FirebaseApp
+import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -28,6 +30,22 @@ class MainActivity:ComponentActivity(){
   super.onCreate(savedInstanceState)
   val req=PeriodicWorkRequestBuilder<UpdateWorker>(24,TimeUnit.HOURS).build()
   WorkManager.getInstance(this).enqueueUniquePeriodicWork("zinerom-update-check",ExistingPeriodicWorkPolicy.KEEP,req)
+  if (FirebaseApp.getApps(this).isNotEmpty()) {
+   val topic = when (android.os.Build.MODEL.uppercase()) {
+    "SM-A528B", "SM-A528N", "SM-A528U", "SM-A528W" -> "zinerom_a52s-5g"
+    "SM-A536B", "SM-A536E" -> "zinerom_a53-5g"
+    "SM-A346B", "SM-A346E" -> "zinerom_a34-5g"
+    "SM-A256B", "SM-A256E" -> "zinerom_a25-5g"
+    "SM-A155F" -> "zinerom_a15-4g"
+    "SM-A165F" -> "zinerom_a16-4g"
+    "SM-A115F" -> "zinerom_a11-4g"
+    "SM-A245F" -> "zinerom_a24-4g"
+    "SM-X216B" -> "zinerom_tab-a9-plus-5g-x216b"
+    else -> null
+   }
+   FirebaseMessaging.getInstance().subscribeToTopic("zinerom_all")
+   if (topic != null) FirebaseMessaging.getInstance().subscribeToTopic(topic)
+  }
   setContent { ZineApp() }
  }
 }
