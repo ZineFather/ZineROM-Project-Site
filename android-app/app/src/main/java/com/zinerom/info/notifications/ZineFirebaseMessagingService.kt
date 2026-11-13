@@ -3,6 +3,8 @@ package com.zinerom.info.notifications
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -13,6 +15,7 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlin.math.roundToInt
 
 class ZineFirebaseMessagingService : FirebaseMessagingService() {
 
@@ -92,9 +95,18 @@ class ZineFirebaseMessagingService : FirebaseMessagingService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Status-bar icons must be transparent monochrome vectors, never the full-colour launcher icon.
+        val largeIconSizePx = (64f * resources.displayMetrics.density).roundToInt()
+        val largeIcon: Bitmap? = BitmapFactory.decodeResource(resources, R.drawable.zine_app_icon)
+            ?.let { source ->
+                Bitmap.createScaledBitmap(source, largeIconSizePx, largeIconSizePx, true).also {
+                    if (it !== source) source.recycle()
+                }
+            }
+
         val notification = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.drawable.ic_stat_zinerom)
-            // No large icon is assigned; Android displays only the small monochrome status icon.
+            .setLargeIcon(largeIcon)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
