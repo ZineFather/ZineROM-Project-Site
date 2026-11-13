@@ -1,6 +1,9 @@
 package com.zinerom.info.notifications
 
 import android.app.NotificationChannel
+import android.app.PendingIntent
+import android.content.Intent
+import android.net.Uri
 import android.app.NotificationManager
 import android.os.Build
 import com.google.firebase.messaging.FirebaseMessagingService
@@ -30,13 +33,28 @@ class ZineFirebaseMessagingService : FirebaseMessagingService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager.createNotificationChannel(NotificationChannel(channelId, "ZineROM updates", NotificationManager.IMPORTANCE_DEFAULT))
         }
+        val destination = message.data["button_url"]
+            ?.takeIf { it.startsWith("https://") }
+            ?: "https://zinefather.github.io/ZineROM-Project-Site/"
+        val openWebsite = Intent(Intent.ACTION_VIEW, Uri.parse(destination))
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            (System.currentTimeMillis() % Int.MAX_VALUE).toInt(),
+            openWebsite,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         val notification = android.app.Notification.Builder(this, channelId)
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(android.app.Notification.BigTextStyle().bigText(body))
+            .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()
-        manager.notify((System.currentTimeMillis() % Int.MAX_VALUE).toInt(), notification)
+        try {
+            manager.notify((System.currentTimeMillis() % Int.MAX_VALUE).toInt(), notification)
+        } catch (_: SecurityException) {
+            // Notification permission may be disabled by the user.
+        }
     }
 }
