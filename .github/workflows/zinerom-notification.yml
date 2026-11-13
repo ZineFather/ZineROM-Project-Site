@@ -3,11 +3,6 @@ name: ZineROM Send Notification
 on:
   workflow_dispatch:
     inputs:
-      title:
-        description: "Notification title"
-        required: true
-        type: string
-        default: "ZineROM — New Update"
       message:
         description: "Notification message"
         required: true
@@ -17,10 +12,16 @@ on:
         description: "Notification category"
         required: true
         type: choice
+        default: "ROM Update"
         options:
-          - UPDATE
-          - ANNOUNCEMENT
-          - MAINTENANCE
+          - "ROM Update"
+          - "Warning"
+          - "Test"
+          - "Developer Analysis"
+          - "Announcement"
+          - "Important"
+          - "Bug Report"
+          - "Maintenance"
       version:
         description: "Version label (optional)"
         required: false
@@ -81,7 +82,6 @@ jobs:
       - name: Send FCM topic notification
         env:
           ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
-          TITLE: ${{ inputs.title }}
           MESSAGE: ${{ inputs.message }}
           NOTICE_TYPE: ${{ inputs.type }}
           TARGET_VERSION: ${{ inputs.version }}
@@ -109,6 +109,18 @@ jobs:
           case "$BUTTON_URL" in
             https://*) ;;
             *) echo "::error::button_url must start with https://"; exit 1 ;;
+          esac
+
+          case "$NOTICE_TYPE" in
+            "ROM Update") TITLE="ZineROM • New Update" ;;
+            "Warning") TITLE="ZineROM • Warning" ;;
+            "Test") TITLE="ZineROM • Test Notification" ;;
+            "Developer Analysis") TITLE="ZineROM • Developer Analysis" ;;
+            "Announcement") TITLE="ZineROM • Announcement" ;;
+            "Important") TITLE="ZineROM • Important Notice" ;;
+            "Bug Report") TITLE="ZineROM • Bug Report" ;;
+            "Maintenance") TITLE="ZineROM • Maintenance" ;;
+            *) echo "::error::Unsupported notification type: $NOTICE_TYPE"; exit 1 ;;
           esac
 
           DISPLAY_MESSAGE="$MESSAGE"
