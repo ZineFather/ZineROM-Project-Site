@@ -94,8 +94,7 @@ class ZineFirebaseMessagingService : FirebaseMessagingService() {
 
         val notification = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.drawable.ic_stat_zinerom)
-            // Keep notifications compact: use only the monochrome status icon, never a large app icon.
-            .setLargeIcon(null)
+            // No large icon is assigned; Android displays only the small monochrome status icon.
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
