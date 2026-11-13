@@ -37,6 +37,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.work.*
 import coil.compose.AsyncImage
@@ -55,7 +60,7 @@ import androidx.core.content.ContextCompat
 
 private const val DEFAULT_TELEGRAM = "https://t.me/ZineROMProject/13/4542"
 private const val DEFAULT_WEBSITE = "https://zinefather.github.io/ZineROM-Project-Site/"
-private const val NOTIFICATION_CHANNEL = "zinerom_updates"
+private const val NOTIFICATION_CHANNEL = "zinerom_alerts_v2"
 private const val CURRENT_APP_VERSION = "3.2.5"
 private const val DEFAULT_UPDATE_JSON =
     "https://raw.githubusercontent.com/ZineFather/ZineROM-Project-Site/zinerom-info-development/remote/update.json"
@@ -114,8 +119,13 @@ class MainActivity : ComponentActivity() {
 private fun createUpdateChannel(context: Context) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         val channel = NotificationChannel(
-            NOTIFICATION_CHANNEL, "ZineROM Updates", NotificationManager.IMPORTANCE_DEFAULT
-        )
+            NOTIFICATION_CHANNEL, "ZineROM Alerts", NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Important ZineROM announcements and update alerts"
+            enableVibration(true)
+            enableLights(true)
+            setShowBadge(true)
+        }
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 }
@@ -231,19 +241,31 @@ private fun readDevices(context: Context): List<Device> {
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
+private data class MainTab(val route: String, val label: String, val arabicLabel: String, val icon: ImageVector)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ZineApp() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val navController = rememberNavController()
     var config by remember { mutableStateOf<AppConfig?>(null) }
     var devices by remember { mutableStateOf(emptyList<Device>()) }
     var selectedDevice by remember { mutableStateOf<Device?>(null) }
-    var tab by remember { mutableStateOf("Home") }
     var arabic by remember { mutableStateOf(false) }
     var checking by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Ready") }
     var latestVersion by remember { mutableStateOf("") }
     var releases by remember { mutableStateOf(emptyList<Release>()) }
+
+    val tabs = listOf(
+        MainTab("home", "Home", "الرئيسية", Icons.Default.Home),
+        MainTab("devices", "Devices", "الأجهزة", Icons.Default.PhoneAndroid),
+        MainTab("updates", "Updates", "التحديثات", Icons.Default.SystemUpdate),
+        MainTab("settings", "Settings", "الإعدادات", Icons.Default.Settings)
+    )
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = backStackEntry?.destination?.route ?: "home"
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
@@ -284,91 +306,180 @@ fun ZineApp() {
                     )
                 },
                 bottomBar = {
-                    GlassNavigationBar(
-                        selected = if (selectedDevice != null) "Devices" else tab,
+                    ZineBottomBar(
+                        tabs = tabs,
+                        selectedRoute = currentRoute,
                         arabic = arabic,
-                        onSelect = { selectedDevice = null; tab = it }
+                        onSelect = { route ->
+                            selectedDevice = null
+                            navController.navigate(route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
                     )
                 }
-            ) { padding ->
-                when {
-                    selectedDevice != null -> DeviceDetails(
-                        device = selectedDevice!!, arabic = arabic,
-                        modifier = Modifier.fillMaxSize().padding(padding),
-                        onBack = { selectedDevice = null },
-                        onDownload = { openLink(context, it) }
-                    )
-                    tab == "Devices" -> DevicesScreen(
-                        devices, arabic, Modifier.fillMaxSize().padding(padding),
-                        onDevice = { selectedDevice = it }
-                    )
-                    tab == "Updates" -> UpdatesScreen(
-                        Modifier.fillMaxSize().padding(padding), arabic, checking, status,
-                        latestVersion, releases,
-                        onCheck = {
-                            checking = true
-                            status = if (arabic) "جارٍ التحقق..." else "Checking for updates..."
-                            scope.launch {
-                                try {
-                                    val source = config ?: readConfig(context)
-                                    val result = withContext(Dispatchers.IO) {
-                                        fetchAppUpdate(source.updateJsonUrl)
-                                    }
-                                    val update = result.update
-                                    latestVersion = update?.version?.takeIf { it.isNotBlank() } ?: CURRENT_APP_VERSION
-                                    val hasUpdate = update != null &&
-                                        versionIsNewer(update.version, CURRENT_APP_VERSION)
+            ) { innerPadding ->
+                NavHost(
+                    navController = navController,
+                    startDestination = "home",
+                    modifier = Modifier.fillMaxSize().padding(innerPadding)
+                ) {
+                    composable("home") {
+                        HomeScreen(
+                            devices, arabic, Modifier.fillMaxSize(),
+                            onBrowse = { navController.navigate("devices") },
+                            onUpdates = { navController.navigate("updates") },
+                            onDevice = { selectedDevice = it; navController.navigate("devices") }
+                        )
+                    }
+                    composable("devices") {
+                        if (selectedDevice != null) {
+                            DeviceDetails(
+                                device = selectedDevice!!,
+                                arabic = arabic,
+                                modifier = Modifier.fillMaxSize(),
+                                onBack = { selectedDevice = null },
+                                onDownload = { openLink(context, it) }
+                            )
+                        } else {
+                            DevicesScreen(
+                                devices, arabic, Modifier.fillMaxSize(),
+                                onDevice = { selectedDevice = it }
+                            )
+                        }
+                    }
+                    composable("updates") {
+                        UpdatesScreen(
+                            Modifier.fillMaxSize(), arabic, checking, status,
+                            latestVersion, releases,
+                            onCheck = {
+                                checking = true
+                                status = if (arabic) "جارٍ التحقق..." else "Checking for updates..."
+                                scope.launch {
+                                    try {
+                                        val source = config ?: readConfig(context)
+                                        val result = withContext(Dispatchers.IO) {
+                                            fetchAppUpdate(source.updateJsonUrl)
+                                        }
+                                        val update = result.update
+                                        latestVersion = update?.version?.takeIf { it.isNotBlank() } ?: CURRENT_APP_VERSION
+                                        val hasUpdate = update != null && versionIsNewer(update.version, CURRENT_APP_VERSION)
 
-                                    // ROM release cards remain sourced from releases.json; app updates use update.json only.
-                                    releases = try {
-                                        withContext(Dispatchers.IO) {
-                                            val request = Request.Builder().url(source.releasesUrl).build()
-                                            httpClient.newCall(request).execute().use { response ->
-                                                if (!response.isSuccessful) throw IllegalStateException("HTTP " + response.code)
-                                                val feed = JSONObject(response.body?.string().orEmpty())
-                                                val entries = feed.optJSONArray("releases") ?: org.json.JSONArray()
-                                                (0 until entries.length()).map { i ->
-                                                    val entry = entries.getJSONObject(i)
-                                                    Release(
-                                                        entry.optString("title", "ZineROM"),
-                                                        entry.optString("version"),
-                                                        entry.optString("device_id"),
-                                                        entry.optString("download_url").takeIf { it.startsWith("https://") }
-                                                    )
+                                        releases = try {
+                                            withContext(Dispatchers.IO) {
+                                                val request = Request.Builder().url(source.releasesUrl).build()
+                                                httpClient.newCall(request).execute().use { response ->
+                                                    if (!response.isSuccessful) throw IllegalStateException("HTTP " + response.code)
+                                                    val feed = JSONObject(response.body?.string().orEmpty())
+                                                    val entries = feed.optJSONArray("releases") ?: org.json.JSONArray()
+                                                    (0 until entries.length()).map { i ->
+                                                        val entry = entries.getJSONObject(i)
+                                                        Release(
+                                                            entry.optString("title", "ZineROM"),
+                                                            entry.optString("version"),
+                                                            entry.optString("device_id"),
+                                                            entry.optString("download_url").takeIf { it.startsWith("https://") }
+                                                        )
+                                                    }
                                                 }
                                             }
-                                        }
-                                    } catch (_: Exception) { emptyList() }
+                                        } catch (_: Exception) { emptyList() }
 
-                                    status = when {
-                                        result.hasTargetRules && update == null ->
-                                            if (arabic) "لا يوجد تحديث مخصص لهذا الجهاز" else "No update targeted to this device"
-                                        hasUpdate ->
-                                            if (arabic) "يتوفر تحديث جديد: " + latestVersion + " — افتح الموقع للتفاصيل"
-                                            else "Update available: " + latestVersion + " — open the website for details"
-                                        else ->
-                                            if (arabic) "أنت على أحدث إصدار: " + CURRENT_APP_VERSION
-                                            else "You're up to date: " + CURRENT_APP_VERSION
+                                        status = when {
+                                            result.hasTargetRules && update == null ->
+                                                if (arabic) "لا يوجد تحديث مخصص لهذا الجهاز" else "No update targeted to this device"
+                                            hasUpdate ->
+                                                if (arabic) "يتوفر تحديث جديد: $latestVersion — افتح الموقع للتفاصيل"
+                                                else "Update available: $latestVersion — open the website for details"
+                                            else ->
+                                                if (arabic) "أنت على أحدث إصدار: $CURRENT_APP_VERSION"
+                                                else "You're up to date: $CURRENT_APP_VERSION"
+                                        }
+                                    } catch (error: Exception) {
+                                        status = (if (arabic) "فشل التحقق: " else "Check failed: ") +
+                                            (error.localizedMessage ?: "Network error")
+                                    } finally { checking = false }
+                                }
+                            },
+                            onChangelog = { openLink(context, config?.websiteUrl ?: DEFAULT_WEBSITE) },
+                            onDownload = { openLink(context, it) }
+                        )
+                    }
+                    composable("settings") {
+                        SettingsAboutScreen(
+                            arabic = arabic,
+                            onLanguage = { arabic = !arabic },
+                            onNotificationSettings = {
+                                val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                    Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+                                        putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                        putExtra(android.provider.Settings.EXTRA_CHANNEL_ID, NOTIFICATION_CHANNEL)
                                     }
-                                } catch (error: Exception) {
-                                    status = (if (arabic) "فشل التحقق: " else "Check failed: ") +
-                                        (error.localizedMessage ?: "Network error")
-                                } finally { checking = false }
-                            }
-                        },
-                        onChangelog = { openLink(context, config?.websiteUrl ?: DEFAULT_WEBSITE) },
-                        onDownload = { openLink(context, it) }
-                    )
-                    tab == "About" -> AboutScreen(
-                        Modifier.fillMaxSize().padding(padding), arabic,
-                        onWebsite = { openLink(context, config?.websiteUrl) },
-                        onTelegram = { openLink(context, config?.telegramUrl ?: DEFAULT_TELEGRAM) }
-                    )
-                    else -> HomeScreen(
-                        devices, arabic, Modifier.fillMaxSize().padding(padding),
-                        onBrowse = { tab = "Devices" },
-                        onUpdates = { tab = "Updates" },
-                        onDevice = { selectedDevice = it }
+                                } else {
+                                    Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(
+                                        android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName
+                                    )
+                                }
+                                context.startActivity(intent)
+                            },
+                            onWebsite = { openLink(context, config?.websiteUrl ?: DEFAULT_WEBSITE) },
+                            onTelegram = { openLink(context, config?.telegramUrl ?: DEFAULT_TELEGRAM) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ZineBottomBar(
+    tabs: List<MainTab>,
+    selectedRoute: String,
+    arabic: Boolean,
+    onSelect: (String) -> Unit
+) {
+    Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp))
+                .background(Brush.linearGradient(listOf(Color(0xF0203045), Color(0xF0101928))))
+                .border(1.dp, Color.White.copy(alpha = .12f), RoundedCornerShape(26.dp))
+                .padding(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            tabs.forEach { tab ->
+                val active = selectedRoute == tab.route
+                Column(
+                    Modifier.weight(1f).clip(RoundedCornerShape(20.dp))
+                        .background(if (active) Blue.copy(alpha = .16f) else Color.Transparent)
+                        .clickable { onSelect(tab.route) }
+                        .padding(vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        if (active) Box(
+                            Modifier.size(width = 24.dp, height = 3.dp).align(Alignment.TopCenter)
+                                .offset(y = (-7).dp).clip(RoundedCornerShape(3.dp)).background(Blue)
+                        )
+                        Icon(
+                            tab.icon,
+                            contentDescription = if (arabic) tab.arabicLabel else tab.label,
+                            tint = if (active) Blue else Color(0xFF91A2B8),
+                            modifier = Modifier.size(21.dp)
+                        )
+                    }
+                    Text(
+                        if (arabic) tab.arabicLabel else tab.label,
+                        color = if (active) Color.White else Color(0xFF91A2B8),
+                        fontSize = 9.sp,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                        maxLines = 1
                     )
                 }
             }
@@ -376,42 +487,70 @@ fun ZineApp() {
     }
 }
 
-private data class NavDestination(val id: String, val label: String, val icon: ImageVector)
-
 @Composable
-private fun GlassNavigationBar(selected: String, arabic: Boolean, onSelect: (String) -> Unit) {
-    val items = listOf(
-        NavDestination("Home", if (arabic) "الرئيسية" else "Home", Icons.Default.Home),
-        NavDestination("Devices", if (arabic) "الأجهزة" else "Devices", Icons.Default.PhoneAndroid),
-        NavDestination("Updates", if (arabic) "التحديثات" else "Updates", Icons.Default.SystemUpdate),
-        NavDestination("About", if (arabic) "حول" else "About", Icons.Default.Info)
-    )
-    Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 17.dp, vertical = 9.dp)) {
-        Box(
-            Modifier.align(Alignment.Center).fillMaxWidth(.78f).height(34.dp)
-                .blur(22.dp).clip(RoundedCornerShape(50))
-                .background(Blue.copy(alpha = .20f))
-        )
-        Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(30.dp))
-                .background(Brush.linearGradient(listOf(Color(0xE62A3A50), Color(0xE6101928), Color(0xE62A3A50))))
-                .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(alpha = .24f), Blue.copy(alpha = .25f), Color.White.copy(alpha = .06f))), RoundedCornerShape(30.dp))
-                .padding(7.dp),
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            items.forEach { item ->
-                val active = selected == item.id
-                Column(
-                    Modifier.weight(1f).clip(RoundedCornerShape(22.dp))
-                        .background(if (active) Blue.copy(alpha = .18f) else Color.Transparent)
-                        .clickable { onSelect(item.id) }
-                        .padding(vertical = 7.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+private fun SettingsAboutScreen(
+    arabic: Boolean,
+    onLanguage: () -> Unit,
+    onNotificationSettings: () -> Unit,
+    onWebsite: () -> Unit,
+    onTelegram: () -> Unit
+) {
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(18.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        item {
+            Text(if (arabic) "الإعدادات" else "Settings", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+            Text(
+                if (arabic) "تحكم في تجربة التطبيق والإشعارات." else "Manage your app experience and notification behavior.",
+                color = Color(0xFF9AAABD), fontSize = 12.sp
+            )
+        }
+        item {
+            GlassPanel {
+                Text(if (arabic) "التفضيلات" else "PREFERENCES", color = Blue, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Row(
+                    Modifier.fillMaxWidth().clickable(onClick = onLanguage),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(item.icon, contentDescription = item.label, tint = if (active) Blue else Color(0xFF9AAABD), modifier = Modifier.size(20.dp))
-                    Text(item.label, color = if (active) Color.White else Color(0xFF9AAABD), fontSize = 9.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Medium, maxLines = 1)
+                    Icon(Icons.Default.Language, contentDescription = null, tint = Blue)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(if (arabic) "لغة التطبيق" else "App language", color = Color.White, fontWeight = FontWeight.SemiBold)
+                        Text(if (arabic) "العربية / English" else "English / Arabic", color = Color(0xFF9AAABD), fontSize = 11.sp)
+                    }
+                    Text(if (arabic) "تغيير" else "Change", color = Blue, fontSize = 12.sp)
+                }
+                HorizontalDivider(color = Color.White.copy(alpha = .08f))
+                Row(
+                    Modifier.fillMaxWidth().clickable(onClick = onNotificationSettings),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = Blue)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(if (arabic) "إعدادات ظهور الإشعارات" else "Notification pop-up settings", color = Color.White, fontWeight = FontWeight.SemiBold)
+                        Text(if (arabic) "الصوت والنوافذ المنبثقة وقناة التنبيهات" else "Sound, pop-up banners and alert behavior", color = Color(0xFF9AAABD), fontSize = 11.sp)
+                    }
+                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Blue)
+                }
+            }
+        }
+        item {
+            GlassPanel {
+                Text(if (arabic) "عن التطبيق" else "ABOUT ZINEROM", color = Blue, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text("ZineROM Info", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text("Version $CURRENT_APP_VERSION", color = Color(0xFF9AAABD), fontSize = 12.sp)
+                OutlinedButton(onClick = onWebsite, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.Language, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (arabic) "الموقع الرسمي" else "Official website")
+                }
+                OutlinedButton(onClick = onTelegram, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.Send, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (arabic) "قناة تيليجرام" else "Telegram channel")
                 }
             }
         }
