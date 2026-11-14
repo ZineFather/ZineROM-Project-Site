@@ -44,8 +44,8 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "$GOOGLE_SERVICES_JSON" ]; then
-            echo "::notice::GOOGLE_SERVICES_JSON is not configured. Building the APK without Firebase push notifications."
-            exit 0
+            echo "::error::GOOGLE_SERVICES_JSON secret is required. Refusing to build an APK without working Firebase push notifications."
+            exit 1
           fi
           printf '%s' "$GOOGLE_SERVICES_JSON" > android-app/app/google-services.json
           PROJECT_ID=$(jq -r '.project_info.project_id // empty' android-app/app/google-services.json)
