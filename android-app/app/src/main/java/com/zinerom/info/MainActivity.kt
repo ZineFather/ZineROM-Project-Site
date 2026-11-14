@@ -69,7 +69,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 
-private const val DEFAULT_TELEGRAM = "https://t.me/ZineROMProject/13/4542"
+private const val DEFAULT_TELEGRAM = "https://t.me/ZineROMProject"
 private const val DEFAULT_WEBSITE = "https://zinefather.github.io/ZineROM-Project-Site/"
 private const val NOTIFICATION_CHANNEL = "zinerom_alerts_v2"
 private val CURRENT_APP_VERSION: String get() = BuildConfig.VERSION_NAME
