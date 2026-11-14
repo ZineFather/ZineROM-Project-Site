@@ -117,6 +117,12 @@ class ZineFirebaseMessagingService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
         super.onNewToken(token)
         Log.i(TAG, "FCM registration token refreshed")
+        // Re-subscribe after token rotation so this device keeps receiving broadcasts.
+        FirebaseMessaging.getInstance().subscribeToTopic("zinerom_all")
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) Log.i(TAG, "Re-subscribed to zinerom_all")
+                else Log.e(TAG, "Re-subscription to zinerom_all failed", task.exception)
+            }
     }
 
     companion object {
