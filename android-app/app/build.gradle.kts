@@ -6,10 +6,16 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-// Firebase is enabled only when google-services.json is supplied by the build environment.
-if (file("google-services.json").exists()) {
-    apply(plugin = "com.google.gms.google-services")
+// Firebase is mandatory for every build variant. Never produce an APK that
+// appears installable but cannot register for ZineROM push notifications.
+val googleServicesFile = file("google-services.json")
+if (!googleServicesFile.isFile || googleServicesFile.length() == 0L) {
+    throw GradleException(
+        "Missing android-app/app/google-services.json. Configure the Firebase Android client " +
+            "for project zinerom-updates and package com.zinerom.info before building."
+    )
 }
+apply(plugin = "com.google.gms.google-services")
 
 // Stable signing material is supplied through CI/local environment variables.
 // Never commit the keystore or its passwords to the repository.
