@@ -1,7 +1,7 @@
 {
-  "version": "3.2.4",
+  "version": "3.3.4",
   "download_url": "",
   "changelog_url": "https://t.me/ZineROMProject/13/4542",
-  "notes": "Latest supported ZineROM build version. Compare this value with the installed Android Build Number.",
+  "notes": "ZineROM Info app release 3.3.4. ROM version is tracked separately in latest_rom_version.",
   "latest_rom_version": "3.2.5"
 }
