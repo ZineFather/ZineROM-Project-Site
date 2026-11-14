@@ -75,6 +75,9 @@ private const val NOTIFICATION_CHANNEL = "zinerom_alerts_v2"
 private val CURRENT_APP_VERSION: String get() = BuildConfig.VERSION_NAME
 private const val MIN_REQUIRED_APP_VERSION = "3.2.5"
 private const val BUG_REPORT_URL = "https://t.me/ZineROMProject/9"
+private const val PROJECT_TELEGRAM_URL = "https://t.me/ZineROMProject"
+private const val UPDATES_TELEGRAM_URL = "https://t.me/zineromupdates"
+private const val OWNER_TELEGRAM_URL = "https://t.me/ZineFather"
 private const val DEFAULT_UPDATE_JSON =
     "https://raw.githubusercontent.com/ZineFather/ZineROM-Project-Site/zinerom-info-development/remote/update.json"
 private val httpClient = OkHttpClient()
@@ -355,6 +358,13 @@ private fun devicePageUrl(websiteUrl: String, deviceId: String): String {
     return "$base/#/devices/${Uri.encode(deviceId)}"
 }
 
+private fun executeRootCommand(command: String): Pair<Int, String> {
+    // Commands are selected from a fixed allow-list in the UI; never pass user input here.
+    val process = ProcessBuilder("su", "-c", command).redirectErrorStream(true).start()
+    val output = process.inputStream.bufferedReader().use { it.readText() }
+    return process.waitFor() to output
+}
+
 private fun openLink(context: Context, url: String?) {
     if (!url.isNullOrBlank() && url.startsWith("https://")) {
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
@@ -470,6 +480,18 @@ fun ZineApp() {
         }
     }
     val navController = rememberNavController()
+    var rebootMenuExpanded by remember { mutableStateOf(false) }
+    val requestRootReboot: (String, String) -> Unit = { command, label ->
+        rebootMenuExpanded = false
+        scope.launch {
+            val result = withContext(Dispatchers.IO) { runCatching { executeRootCommand(command) } }
+            when {
+                result.isFailure -> Toast.makeText(context, "Root command failed: " + (result.exceptionOrNull()?.localizedMessage ?: "Unknown error"), Toast.LENGTH_LONG).show()
+                result.getOrNull()?.first == 0 -> Toast.makeText(context, "$label command accepted", Toast.LENGTH_SHORT).show()
+                else -> Toast.makeText(context, "Root denied or command failed: " + result.getOrNull()?.second.orEmpty(), Toast.LENGTH_LONG).show()
+            }
+        }
+    }
     var config by remember { mutableStateOf<AppConfig?>(null) }
     var devices by remember { mutableStateOf(emptyList<Device>()) }
     var moduleCatalog by remember { mutableStateOf(emptyList<ModuleCatalogItem>()) }
@@ -597,6 +619,17 @@ fun ZineApp() {
                             }
                         },
                         actions = {
+                            Box {
+                                IconButton(onClick = { rebootMenuExpanded = true }) {
+                                    Icon(Icons.Default.PowerSettingsNew, contentDescription = if (arabic) "إعادة التشغيل" else "Reboot", tint = Blue)
+                                }
+                                DropdownMenu(expanded = rebootMenuExpanded, onDismissRequest = { rebootMenuExpanded = false }) {
+                                    DropdownMenuItem(text = { Text(if (arabic) "إعادة تشغيل النظام" else "Reboot system") }, leadingIcon = { Icon(Icons.Default.RestartAlt, contentDescription = null) }, onClick = { requestRootReboot("reboot", "System reboot") })
+                                    DropdownMenuItem(text = { Text(if (arabic) "إعادة تشغيل الريكفري" else "Reboot recovery") }, leadingIcon = { Icon(Icons.Default.Build, contentDescription = null) }, onClick = { requestRootReboot("reboot recovery", "Recovery reboot") })
+                                    DropdownMenuItem(text = { Text(if (arabic) "وضع Download" else "Download mode") }, leadingIcon = { Icon(Icons.Default.Download, contentDescription = null) }, onClick = { requestRootReboot("reboot download", "Download mode") })
+                                    DropdownMenuItem(text = { Text(if (arabic) "إعادة تشغيل الواجهة (Soft reboot)" else "Soft reboot (Zygote)") }, leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) }, onClick = { requestRootReboot("setprop ctl.restart zygote", "Soft reboot") })
+                                }
+                            }
                             IconButton(onClick = {
                                 navController.navigate("settings") { launchSingleTop = true }
                             }) {
@@ -1034,6 +1067,7 @@ private fun UpdatesScreen(
     installedRomVersion: String, installedBuildNumber: String, latestVersion: String, releases: List<Release>, onCheck: () -> Unit,
     onChangelog: () -> Unit, onDownload: (String?) -> Unit
 ) {
+    val context = LocalContext.current
     LazyColumn(modifier, contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
             Text(if (arabic) "مركز التحديثات" else "Update center", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
@@ -1058,10 +1092,21 @@ private fun UpdatesScreen(
             GlassPanel {
                 Text(if (arabic) "روابط المشروع" else "PROJECT LINKS", color = Color(0xFF9AAABD), fontSize = 9.sp, letterSpacing = 1.5.sp)
                 OutlinedButton(onClick = onChangelog, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
-                    Icon(Icons.Default.Article, contentDescription = null); Spacer(Modifier.width(8.dp))
+                    Icon(Icons.Default.Language, contentDescription = null); Spacer(Modifier.width(8.dp))
                     Text(if (arabic) "فتح الموقع الرسمي" else "Open official website")
                 }
-
+                OutlinedButton(onClick = { openLink(context, PROJECT_TELEGRAM_URL) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
+                    Icon(Icons.Default.Send, contentDescription = null); Spacer(Modifier.width(8.dp)); Text(if (arabic) "قناة المشروع" else "Project Telegram")
+                }
+                OutlinedButton(onClick = { openLink(context, UPDATES_TELEGRAM_URL) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
+                    Icon(Icons.Default.Notifications, contentDescription = null); Spacer(Modifier.width(8.dp)); Text(if (arabic) "قناة التحديثات" else "Updates channel")
+                }
+                OutlinedButton(onClick = { openLink(context, BUG_REPORT_URL) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
+                    Icon(Icons.Default.BugReport, contentDescription = null); Spacer(Modifier.width(8.dp)); Text(if (arabic) "الإبلاغ عن مشكلة" else "Bug reports")
+                }
+                OutlinedButton(onClick = { openLink(context, OWNER_TELEGRAM_URL) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
+                    Icon(Icons.Default.Person, contentDescription = null); Spacer(Modifier.width(8.dp)); Text(if (arabic) "حساب المطور" else "Developer account")
+                }
             }
         }
         if (releases.isNotEmpty()) {
