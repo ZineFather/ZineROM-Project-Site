@@ -121,19 +121,30 @@ class MainActivity : ComponentActivity() {
         ) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 325)
         }
-        if (FirebaseApp.getApps(this).isNotEmpty()) {
-            FirebaseMessaging.getInstance().subscribeToTopic("zinerom_all")
-                .addOnCompleteListener { task ->
-                    if (task.isSuccessful) {
-                        android.util.Log.i("ZineFCM", "Subscribed to zinerom_all")
-                    } else {
-                        android.util.Log.e("ZineFCM", "Failed to subscribe to zinerom_all", task.exception)
-                    }
-                }
+        // Initialize Firebase before subscribing to the global announcements topic.
+        val firebaseApp = FirebaseApp.getApps(this).firstOrNull() ?: FirebaseApp.initializeApp(this)
+        if (firebaseApp != null) {
+            subscribeToZineRomAnnouncements()
         } else {
-            android.util.Log.e("ZineFCM", "FirebaseApp is not initialized")
+            android.util.Log.e("ZineFCM", "Firebase initialization failed: google-services configuration is missing or invalid")
         }
         setContent { ZineApp() }
+    }
+}
+
+private fun subscribeToZineRomAnnouncements() {
+    runCatching {
+        FirebaseMessaging.getInstance().isAutoInitEnabled = true
+        FirebaseMessaging.getInstance().subscribeToTopic("zinerom_all")
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    android.util.Log.i("ZineFCM", "Successfully subscribed to zinerom_all")
+                } else {
+                    android.util.Log.e("ZineFCM", "Topic subscription failed", task.exception)
+                }
+            }
+    }.onFailure {
+        android.util.Log.e("ZineFCM", "Unable to initialize Firebase Messaging", it)
     }
 }
 
